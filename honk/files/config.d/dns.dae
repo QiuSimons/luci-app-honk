@@ -1,0 +1,22 @@
+# dns.dae
+dns {
+    #ipversion_prefer: 4
+    upstream {
+        local: 'udp://127.0.0.1:53'
+        remote: 'tcp+udp://8.8.4.4:53'
+    }
+    routing {
+        request {
+            qtype(https) -> reject
+            qname(geosite:gfw) -> remote
+            fallback: local
+        }
+        response {
+            upstream(remote) -> accept
+            qname(geosite:private) -> accept
+            ip(geoip:cn) -> accept
+            fallback: remote
+        }
+    }
+}
+

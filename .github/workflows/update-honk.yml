@@ -1,0 +1,41 @@
+name: Update honk version
+
+on:
+  schedule:
+    - cron: '17 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Update honk core version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Update honk version
+        run: bash scripts/update_honk_version.sh
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No version change."
+          else
+            TAG="$(grep '^HONK_RELEASE_TAG:=' honk/Makefile | cut -d= -f2)"
+            git add honk/Makefile
+            git commit -m "honk: update to ${TAG}"
+          fi
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: master
+        continue-on-error: true
