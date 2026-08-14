@@ -13,7 +13,7 @@ OpenWrt 上的 honk（eBPF 透明代理引擎，dae 兼容）LuCI 管理界面�
 把本仓库放入 OpenWrt 源码树的 `package/honk`：
 
 ```bash
-git clone https://github.com/<owner>/luci-app-honk package/honk
+git clone https://github.com/QiuSimons/luci-app-honk package/honk
 ```
 
 然后：
