@@ -24,6 +24,7 @@ function index()
 	entry({"admin", "services", "honk", "route"}, cbi("honk/route"), _("Routing Settings"), 4)
 	entry({"admin", "services", "honk", "log"}, cbi("honk/log"), _("Logs"), 5)
 	entry({"admin", "services", "honk", "get_log"}, call("get_log"))
+	entry({"admin", "services", "honk", "clear_log"}, call("clear_log"))
 end
 
 function act_status()
@@ -45,6 +46,10 @@ function act_status()
 end
 
 function get_log()
-	http.write(sys.exec("logread 2>/dev/null | grep -i honk | tail -n 1000"))
+	http.write(sys.exec("tail -n 1000 /var/log/honk/honk.log 2>/dev/null"))
+end
+
+function clear_log()
+	sys.call("true > /var/log/honk/honk.log")
 end
 

@@ -12,6 +12,7 @@ global {
     wan_interface: auto
     auto_config_kernel_parameter: true
     data_dir: '/etc/honk'
+	log_file: '/var/log/honk/honk.log'
     store_subscribe: true
     dial_mode: domain
     bootstrap_resolver: '223.5.5.5:53'
