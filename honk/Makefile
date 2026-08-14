@@ -45,7 +45,7 @@ define Package/honk
   URL:=https://github.com/daeuniverse/honk
   DEPENDS:=@(x86_64||aarch64) \
     +ca-bundle +ip-full \
-    +kmod-sched-core +kmod-sched-bpf +kmod-veth \
+    +kmod-sched-core +kmod-sched-bpf +kmod-veth +kmod-nft-queue \
     +v2ray-geoip +v2ray-geosite \
     +@KERNEL_XDP_SOCKETS \
     +HONK_USE_VMLINUX_BTF:vmlinux-btf
