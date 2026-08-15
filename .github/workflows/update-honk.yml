@@ -7,11 +7,13 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   update:
     name: Update honk core version
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,20 +24,35 @@ jobs:
         run: bash scripts/update_honk_version.sh
 
       - name: Commit changes
+        id: commit
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No version change."
           else
             TAG="$(grep '^HONK_RELEASE_TAG:=' honk/Makefile | cut -d= -f2)"
+
             git add honk/Makefile
             git commit -m "honk: update to ${TAG}"
+
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Push changes
+        if: steps.commit.outputs.changed == 'true'
         uses: ad-m/github-push-action@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: master
-        continue-on-error: true
+
+      - name: Trigger build packages
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "Build packages" --ref master
