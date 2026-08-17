@@ -108,8 +108,7 @@ main() {
     [ -n "$tag" ] || { echo "error: unable to resolve honk release tag" >&2; exit 1; }
     version="$(derive_version "$tag")"
 
-    suffix="$(grep '^HONK_SUFFIX:=' "$MAKEFILE" | head -n 1 | cut -d= -f2)"
-    [ -n "$suffix" ] || suffix="-stock"
+    suffix="$(grep '^HONK_SUFFIX:=' "$MAKEFILE" | head -n 1 | cut -d= -f2-)"
 
     hash_x86_64="$(resolve_hash HONK_HASH_X86_64 "x86_64-unknown-linux-musl" "$suffix" "$tag")"
     hash_aarch64="$(resolve_hash HONK_HASH_AARCH64 "aarch64-unknown-linux-musl" "$suffix" "$tag")"
