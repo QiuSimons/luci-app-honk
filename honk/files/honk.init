@@ -44,9 +44,10 @@ update_cron() {
 
 cleanup_netns() {
     ip netns del "$HONK_NETNS_NAME" 2>/dev/null || true
+    umount "$HONK_NETNS_PATH" 2>/dev/null || true
+    rm -f "$HONK_NETNS_PATH" 2>/dev/null || true
     ip link del "$HONK_HOST_IFACE" 2>/dev/null || true
     ip link del "$HONK_PEER_IFACE" 2>/dev/null || true
-    rm -f "$HONK_NETNS_PATH" 2>/dev/null || true
 }
 
 hijack_resolv_conf() {
