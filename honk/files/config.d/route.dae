@@ -15,8 +15,14 @@ routing {
     dip(geoip:telegram) -> proxy
     dip(geoip:cn) -> direct
 
+    # geoip:cn always using chiness asn, can use domain rule to override
+    domain(geosite: cn) -> direct
+
+    # block quic, if u node has quic support, remove this line
     l4proto(udp) && dport(443) -> block
 
-    fallback: proxy
-}
+    # using proxy for ssh, http, https, and common ports, avoid (bt, or other p2p)
+    dport(22, 80, 443, 8080, 6443, 9090) -> proxy
 
+    fallback: direct
+}
