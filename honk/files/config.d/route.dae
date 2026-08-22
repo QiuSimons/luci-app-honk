@@ -4,7 +4,8 @@ routing {
     dip(224.0.0.0/3, 'ff00::/8', geoip:private) -> direct
     domain(geosite:category-bank-cn, geosite:boc@!cn, geosite:synology, geosite:sina) -> direct
 
-    domain(geosite:category-ai-!cn, geosite:spotify, geosite:tiktok, geosite:github, geosite:gfw) && l4proto(udp) && dport(443) -> block
+    # block quic, if u node has quic support, remove this line
+    l4proto(udp) && dport(443) -> block
 
     domain(geosite:spotify) -> proxy
     domain(geosite:category-doh) -> proxy
@@ -17,9 +18,6 @@ routing {
 
     # geoip:cn always using chiness asn, can use domain rule to override
     domain(geosite: cn) -> direct
-
-    # block quic, if u node has quic support, remove this line
-    l4proto(udp) && dport(443) -> block
 
     # using proxy for ssh, http, https, and common ports, avoid (bt, or other p2p)
     dport(22, 80, 443, 8080, 6443, 9090) -> proxy
