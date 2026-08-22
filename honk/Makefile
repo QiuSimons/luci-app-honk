@@ -3,12 +3,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=honk
-PKG_VERSION:=0.0.1_beta57
+PKG_VERSION:=0.0.1_beta56
 PKG_RELEASE:=1
 
 # Raw upstream release tag. It keeps the dots in qualifiers (e.g. v0.0.1.beta.49)
 # because that is what the GitHub release asset name uses.
-HONK_RELEASE_TAG:=v0.0.1.beta.57
+HONK_RELEASE_TAG:=v0.0.1.beta.56
 
 # SHA256 of each release tarball, kept in sync by scripts/update_honk_version.sh.
 HONK_HASH_X86_64:=7a7f26d02ed3ee9d0bd1735df07214fa98baaab9d6d7ef08833ddbf30754cce4
@@ -28,7 +28,7 @@ endif
 
 # Default to the stock-malloc build: lower RSS high-water on small gateways.
 # Use an empty suffix to switch back to the mimalloc build (faster QUIC).
-HONK_SUFFIX:=
+HONK_SUFFIX:=-stock
 HONK_ASSET:=honk-core-$(HONK_RELEASE_TAG)-$(HONK_TARGET)$(HONK_SUFFIX).tar.gz
 
 PKG_SOURCE:=$(HONK_ASSET)
