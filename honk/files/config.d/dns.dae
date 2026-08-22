@@ -1,5 +1,6 @@
 # dns.dae
 dns {
+    bind:'tcp+udp://[::]:53530'
     client_subnet:auto
     #ipversion_prefer:4
     upstream {
