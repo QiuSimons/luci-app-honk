@@ -31,19 +31,62 @@ git_ls_remote() {
 
 derive_version() {
     local tag="$1"
-    local v="${tag#v}"
-    v="${v#V}"
+    local v="${tag#[vV]}"
     local prefix
-    local suffix
+    local rest
+    local stage=""
+    local stage_num=""
+    local patch_num=""
 
+    # 1. 提取主版本号 (如 0.0.1)
     prefix="$(printf '%s' "$v" | sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/')"
-    suffix="$(printf '%s' "$v" | sed -E 's/^[0-9]+(\.[0-9]+)*//' | tr -cd 'A-Za-z0-9')"
+    [ -n "$prefix" ] || prefix="0.0.0"
 
-    if [ -n "$suffix" ]; then
-        printf '%s_%s\n' "$prefix" "$suffix"
-    else
+    # 2. 提取剩余后缀并去除起始分隔符
+    rest="${v#"$prefix"}"
+    rest="$(printf '%s' "$rest" | sed -E 's/^[-_.]+//')"
+
+    if [ -z "$rest" ]; then
         printf '%s\n' "$prefix"
+        return 0
     fi
+
+    # 3. 提取 Alpine 合法的预发布阶段及版本号 (alpha, beta, pre, rc 等)
+    if printf '%s' "$rest" | grep -qiE '^(alpha|beta|pre|rc|cvs|git|hg|svn)'; then
+        stage="$(printf '%s' "$rest" | sed -E -n 's/^(alpha|beta|pre|rc|cvs|git|hg|svn).*/\1/Ip' | tr '[:upper:]' '[:lower:]')"
+        rest="$(printf '%s' "$rest" | sed -E 's/^(alpha|beta|pre|rc|cvs|git|hg|svn)//I' | sed -E 's/^[-_.]+//')"
+
+        # 匹配阶段后紧跟的数字 (例如 beta79 中的 79)
+        stage_num="$(printf '%s' "$rest" | sed -E -n 's/^([0-9]+).*/\1/p')"
+        if [ -n "$stage_num" ]; then
+            rest="${rest#"$stage_num"}"
+            rest="$(printf '%s' "$rest" | sed -E 's/^[-_.]+//')"
+        fi
+    fi
+
+    # 4. 解析 fix/patch，映射为 Alpine 标准的 _p{N}
+    if [ -n "$rest" ]; then
+        if printf '%s' "$rest" | grep -qiE '^(fix)+$'; then
+            # 统计连续出现的 fix 次数 (fix -> 1, fixfix -> 2)
+            patch_num="$(printf '%s' "$rest" | grep -o -i 'fix' | wc -l | tr -d '[:space:]')"
+        elif printf '%s' "$rest" | grep -qiE '^(fix|patch|hotfix|p)[-_.]?[0-9]+'; then
+            # 显式带有数字编号的修补 (如 fix2, patch1)
+            patch_num="$(printf '%s' "$rest" | sed -E -n 's/^(fix|patch|hotfix|p)[-_.]?([0-9]+).*/\2/Ip')"
+        elif printf '%s' "$rest" | grep -qiE '^(fix|patch|hotfix|p)$'; then
+            patch_num="1"
+        fi
+    fi
+
+    # 5. 组合符合 apk-tools 规范的最终版本
+    local result="$prefix"
+    if [ -n "$stage" ]; then
+        result="${result}_${stage}${stage_num}"
+    fi
+    if [ -n "$patch_num" ]; then
+        result="${result}_p${patch_num}"
+    fi
+
+    printf '%s\n' "$result"
 }
 
 resolve_tag() {
