@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Update honk's package version and per-arch release hashes from the latest
-# daeuniverse/honk release.
-#
-# Primary source: GitHub API /releases/latest.
-# Fallback: git ls-remote --tags + sort -V (works when the API is rate-limited).
-# Hashes are computed from the release tarballs with sha256sum.
-#
-# Offline testing hooks:
-#   HONK_RELEASE_JSON   - feed a fake GitHub API response
-#   HONK_RELEASE_TAG    - force a specific raw tag
-#   HONK_HASH_X86_64    - force the x86_64 tarball sha256
-#   HONK_HASH_AARCH64   - force the aarch64 tarball sha256
-
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MAKEFILE="$REPO_DIR/honk/Makefile"
 UPSTREAM_REPO="daeuniverse/honk"
@@ -29,64 +16,92 @@ git_ls_remote() {
     return 1
 }
 
+calc_sha256() {
+    local file="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$file" | awk '{print $1}'
+    else
+        echo "error: neither sha256sum nor shasum is installed" >&2
+        return 1
+    fi
+}
+
 derive_version() {
     local tag="$1"
     local v="${tag#[vV]}"
-    local prefix
-    local rest
-    local stage=""
-    local stage_num=""
-    local patch_num=""
+    local prefix rest stage stage_num patch_num
+    stage=""
+    stage_num=""
+    patch_num=""
 
-    # 1. 提取主版本号 (如 0.0.1)
+    # 1. 提取主版本号
     prefix="$(printf '%s' "$v" | sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/')"
     [ -n "$prefix" ] || prefix="0.0.0"
 
-    # 2. 提取剩余后缀并去除起始分隔符
+    # 2. 剥离已提取部分及连接符
     rest="${v#"$prefix"}"
     rest="$(printf '%s' "$rest" | sed -E 's/^[-_.]+//')"
 
-    if [ -z "$rest" ]; then
-        printf '%s\n' "$prefix"
-        return 0
-    fi
-
-    # 3. 提取 Alpine 合法的预发布阶段及版本号 (alpha, beta, pre, rc 等)
-    if printf '%s' "$rest" | grep -qiE '^(alpha|beta|pre|rc|cvs|git|hg|svn)'; then
-        stage="$(printf '%s' "$rest" | sed -E -n 's/^(alpha|beta|pre|rc|cvs|git|hg|svn).*/\1/Ip' | tr '[:upper:]' '[:lower:]')"
-        rest="$(printf '%s' "$rest" | sed -E 's/^(alpha|beta|pre|rc|cvs|git|hg|svn)//I' | sed -E 's/^[-_.]+//')"
-
-        # 匹配阶段后紧跟的数字 (例如 beta79 中的 79)
-        stage_num="$(printf '%s' "$rest" | sed -E -n 's/^([0-9]+).*/\1/p')"
-        if [ -n "$stage_num" ]; then
-            rest="${rest#"$stage_num"}"
-            rest="$(printf '%s' "$rest" | sed -E 's/^[-_.]+//')"
-        fi
-    fi
-
-    # 4. 解析 fix/patch，映射为 Alpine 标准的 _p{N}
     if [ -n "$rest" ]; then
-        if printf '%s' "$rest" | grep -qiE '^(fix)+$'; then
-            # 统计连续出现的 fix 次数 (fix -> 1, fixfix -> 2)
-            patch_num="$(printf '%s' "$rest" | grep -o -i 'fix' | wc -l | tr -d '[:space:]')"
-        elif printf '%s' "$rest" | grep -qiE '^(fix|patch|hotfix|p)[-_.]?[0-9]+'; then
-            # 显式带有数字编号的修补 (如 fix2, patch1)
-            patch_num="$(printf '%s' "$rest" | sed -E -n 's/^(fix|patch|hotfix|p)[-_.]?([0-9]+).*/\2/Ip')"
-        elif printf '%s' "$rest" | grep -qiE '^(fix|patch|hotfix|p)$'; then
-            patch_num="1"
+        # 统一小写
+        rest="$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')"
+
+        # 3. 提取阶段性标签 (alpha/beta/rc 等)
+        if printf '%s' "$rest" | grep -qE '^(alpha|beta|pre|rc|cvs|git|hg|svn)'; then
+            stage="$(printf '%s' "$rest" | sed -E -n 's/^(alpha|beta|pre|rc|cvs|git|hg|svn).*/\1/p')"
+            rest="$(printf '%s' "$rest" | sed -E 's/^(alpha|beta|pre|rc|cvs|git|hg|svn)//' | sed -E 's/^[-_.]+//')"
+
+            stage_num="$(printf '%s' "$rest" | sed -E -n 's/^([0-9]+).*/\1/p')"
+            if [ -n "$stage_num" ]; then
+                rest="${rest#"$stage_num"}"
+                rest="$(printf '%s' "$rest" | sed -E 's/^[-_.]+//')"
+            fi
+        fi
+
+        # 4. 提取补丁标签 (抹除所有分隔符，将 fix.fix 压扁为 fixfix)
+        if [ -n "$rest" ]; then
+            rest="$(printf '%s' "$rest" | sed -E 's/[-_.]//g')"
+            if printf '%s' "$rest" | grep -qE '^(fix)+$'; then
+                local orig_len="${#rest}"
+                local stripped_rest="${rest//fix/}"
+                patch_num=$(( (orig_len - ${#stripped_rest}) / 3 ))
+            elif printf '%s' "$rest" | grep -qE '^(fix|patch|hotfix|p)[0-9]+'; then
+                patch_num="$(printf '%s' "$rest" | sed -E -n 's/^(fix|patch|hotfix|p)([0-9]+).*/\2/p')"
+            elif printf '%s' "$rest" | grep -qE '^(fix|patch|hotfix|p)$'; then
+                patch_num="1"
+            fi
         fi
     fi
 
-    # 5. 组合符合 apk-tools 规范的最终版本
+    # 5. 组装合规版本号
     local result="$prefix"
-    if [ -n "$stage" ]; then
-        result="${result}_${stage}${stage_num}"
-    fi
-    if [ -n "$patch_num" ]; then
-        result="${result}_p${patch_num}"
+    [ -z "$stage" ] || result="${result}_${stage}${stage_num}"
+    [ -z "$patch_num" ] || result="${result}_p${patch_num}"
+    
+    printf '%s\n' "$result"
+}
+
+assert_apk_version() {
+    local v="$1"
+    
+    # 策略 1: 本地 apk 工具校验
+    if command -v apk >/dev/null 2>&1; then
+        apk version -c "$v" >/dev/null 2>&1 && return 0 || return 1
     fi
 
-    printf '%s\n' "$result"
+    # 策略 2: 正则静态分析 (模拟 apk-tools 内部验证器)
+    local apk_regex="^[0-9]+(\.[0-9]+)*[a-z]?(_(alpha|beta|pre|rc|cvs|svn|git|hg|p)[0-9]*)*$"
+    if ! printf '%s' "$v" | grep -qE "$apk_regex"; then
+        # 策略 3: 若正则存疑且有 Docker 环境，交由官方 Alpine 容器最终裁决
+        if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            docker run --rm alpine apk version -c "$v" >/dev/null 2>&1 && return 0 || return 1
+        fi
+        return 1
+    fi
+    
+    return 0
 }
 
 resolve_tag() {
@@ -120,7 +135,6 @@ resolve_hash() {
     local tag="$4"
     local asset="honk-core-${tag}-${target}${suffix}.tar.gz"
 
-    # Offline testing hook: force a hash without downloading.
     if [ -n "${!var_name:-}" ]; then
         printf '%s\n' "${!var_name}"
         return 0
@@ -135,7 +149,7 @@ resolve_hash() {
         return 1
     fi
 
-    if ! hash="$(sha256sum "$tmp" | awk '{print $1}')"; then
+    if ! hash="$(calc_sha256 "$tmp")"; then
         rm -f "$tmp"
         echo "error: unable to hash ${asset}" >&2
         return 1
@@ -149,18 +163,35 @@ main() {
     local tag version suffix hash_x86_64 hash_aarch64
     tag="$(resolve_tag)"
     [ -n "$tag" ] || { echo "error: unable to resolve honk release tag" >&2; exit 1; }
+    
     version="$(derive_version "$tag")"
 
-    suffix="$(grep '^HONK_SUFFIX:=' "$MAKEFILE" | head -n 1 | cut -d= -f2-)"
+    if ! assert_apk_version "$version"; then
+        echo "WARNING: Parsed version '${version}' is invalid for apk-tools!" >&2
+        # Fallback：仅提取纯数字基准版本号 (剥离不可靠后缀)
+        version="$(printf '%s' "${tag#[vV]}" | sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/')"
+        [ -n "$version" ] || version="0.0.0"
+        echo "INFO: Falling back to strict safe PKG_VERSION='${version}'" >&2
+    else
+        echo "INFO: Validated PKG_VERSION='${version}'" >&2
+    fi
+
+    suffix="$(grep '^HONK_SUFFIX:=' "$MAKEFILE" | head -n 1 | cut -d= -f2- || true)"
 
     hash_x86_64="$(resolve_hash HONK_HASH_X86_64 "x86_64-unknown-linux-musl" "$suffix" "$tag")"
     hash_aarch64="$(resolve_hash HONK_HASH_AARCH64 "aarch64-unknown-linux-musl" "$suffix" "$tag")"
 
-    sed -i -E "s/^PKG_VERSION:=.*/PKG_VERSION:=${version}/" "$MAKEFILE"
-    sed -i -E "s/^HONK_RELEASE_TAG:=.*/HONK_RELEASE_TAG:=${tag}/" "$MAKEFILE"
-    sed -i -E "s/^HONK_HASH_X86_64:=.*/HONK_HASH_X86_64:=${hash_x86_64}/" "$MAKEFILE"
-    sed -i -E "s/^HONK_HASH_AARCH64:=.*/HONK_HASH_AARCH64:=${hash_aarch64}/" "$MAKEFILE"
+    # [绝对鲁棒点] 放弃 sed -i，单次流式替换，完美兼容 macOS/BSD/Linux
+    sed -E \
+        -e "s/^PKG_VERSION:=.*/PKG_VERSION:=${version}/" \
+        -e "s/^HONK_RELEASE_TAG:=.*/HONK_RELEASE_TAG:=${tag}/" \
+        -e "s/^HONK_HASH_X86_64:=.*/HONK_HASH_X86_64:=${hash_x86_64}/" \
+        -e "s/^HONK_HASH_AARCH64:=.*/HONK_HASH_AARCH64:=${hash_aarch64}/" \
+        "$MAKEFILE" > "${MAKEFILE}.tmp"
+    
+    mv "${MAKEFILE}.tmp" "$MAKEFILE"
 
+    echo "==================================="
     echo "honk updated to ${tag} (PKG_VERSION=${version})"
     echo "HONK_HASH_X86_64=${hash_x86_64}"
     echo "HONK_HASH_AARCH64=${hash_aarch64}"
