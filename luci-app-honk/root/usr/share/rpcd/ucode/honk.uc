@@ -1,3 +1,5 @@
+#!/usr/bin/ucode
+
 'use strict';
 
 import { readfile, writefile, popen, stat, open } from 'fs';
