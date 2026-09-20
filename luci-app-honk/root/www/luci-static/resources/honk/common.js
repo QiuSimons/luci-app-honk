@@ -97,6 +97,7 @@ function ensureEditorStyles() {
 
 	var style = document.createElement('style');
 	style.id = 'honk-editor-custom-style';
+	style.textContent = [
 		'.honk-editor-toolbar { margin-bottom: 6px; margin-top: 2px; display: flex; align-items: center; justify-content: flex-start; }',
 		'.cm-format-btn { margin: 0; cursor: pointer; }',
 		'.cbi-value:has(.CodeMirror) .cbi-value-field { flex: 1 1 0% !important; min-width: 0 !important; }',
