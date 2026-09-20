@@ -23,43 +23,54 @@
 		left: 0;
 		width: 100vw;
 		height: 100vh;
-		background: rgba(0, 0, 0, 0.65);
+		background: rgba(0, 0, 0, 0.6);
 		backdrop-filter: blur(4px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		z-index: 9999;
 	}
-	#update_modal .modal {
+	.zash-modal-box {
 		background: var(--surface-overlay, var(--surface, var(--background-color-high, #ffffff))) !important;
 		color: var(--text, var(--text-color-highest, inherit)) !important;
 		border: 1px solid var(--hairline, var(--border-color-low, #ccc)) !important;
 		border-radius: var(--radius-base, 8px) !important;
-		padding: 24px !important;
-		box-shadow: var(--app-shadow-lg, 0 16px 36px rgba(0, 0, 0, 0.4)) !important;
-		width: 520px;
-		max-width: 90vw;
+		padding: 22px 24px !important;
+		box-shadow: var(--app-shadow-lg, 0 16px 36px rgba(0, 0, 0, 0.35)) !important;
+		width: 500px;
+		max-width: 92vw;
 		margin: 0 !important;
 		box-sizing: border-box;
 	}
-	#btn_close_update_modal:hover {
-		color: var(--text, #fff) !important;
-		background: var(--hover-faint, rgba(255, 255, 255, 0.1)) !important;
+	.zash-modal-close {
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		width: 28px;
+		height: 28px;
+		border-radius: var(--radius-base, 4px);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text-muted, var(--text-color-medium, #888));
+		padding: 0;
+		transition: background-color 0.15s, color 0.15s;
 	}
-	.modal-radio-option:hover {
-		border-color: var(--brand, var(--primary-color-high, #0085b7)) !important;
+	.zash-modal-close:hover {
+		background: var(--hover-faint, rgba(128, 128, 128, 0.15));
+		color: var(--text, var(--text-color-highest, #333));
 	}
 	.zash-log-box {
 		max-height: 150px;
 		overflow-y: auto;
-		font-family: monospace;
+		font-family: var(--font-mono, monospace);
 		font-size: 12px;
 		line-height: 1.4;
 		padding: 8px;
 		margin: 8px 0;
 		background: var(--surface-sunken, var(--background-color-low, transparent));
 		border: 1px solid var(--hairline, var(--border-color-medium, #ccc));
-		border-radius: 3px;
+		border-radius: var(--radius-base, 3px);
 		white-space: pre-wrap;
 		word-break: break-all;
 	}
@@ -197,9 +208,9 @@
 				<span id="status_endpoint_pill" class="label notice" style="font-family: monospace;"></span>
 			</div>
 			<div style="display: flex; align-items: center; gap: 6px;">
-				<button type="button" class="cbi-button" id="btn_update_dashboard" title="<%:更新至最新版 Zashboard%>">↻ <%:更新面板%></button>
-				<button type="button" class="cbi-button" id="btn_refresh_iframe" title="<%:刷新面板内容%>">↺ <%:刷新%></button>
-				<button type="button" class="cbi-button" id="btn_toggle_fullscreen" title="<%:切换全屏显示%>">⛶ <%:全屏%></button>
+				<button type="button" class="cbi-button" id="btn_update_dashboard" title="<%:更新至最新版 Zashboard%>"><%:更新面板%></button>
+				<button type="button" class="cbi-button" id="btn_refresh_iframe" title="<%:刷新面板内容%>"><%:刷新%></button>
+				<button type="button" class="cbi-button" id="btn_toggle_fullscreen" title="<%:切换全屏显示%>"><%:全屏%></button>
 				<a id="btn_external_open" href="#" target="_blank" class="cbi-button cbi-button-action" title="<%:在新标签页中独立打开%>">↗ <%:新标签页%></a>
 			</div>
 		</div>
@@ -210,24 +221,29 @@
 
 	<!-- Update Modal Dialog -->
 	<div id="update_modal" style="display: none;">
-		<div class="modal">
+		<div class="zash-modal-box">
 			<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-				<h4 style="margin: 0; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;">↻ <%:更新 Zashboard 面板%></h4>
-				<button type="button" id="btn_close_update_modal" style="background: transparent; border: none; font-size: 22px; line-height: 1; color: var(--text-muted, #888); cursor: pointer; padding: 2px 6px; border-radius: 4px;">&times;</button>
+				<h4 style="margin: 0; font-size: 16px; font-weight: 600;"><%:更新 Zashboard 面板%></h4>
+				<button type="button" id="btn_close_update_modal" class="zash-modal-close" title="<%:关闭%>">
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<line x1="18" y1="6" x2="6" y2="18"></line>
+						<line x1="6" y1="6" x2="18" y2="18"></line>
+					</svg>
+				</button>
 			</div>
-			<p class="cbi-section-descr" style="margin: 0 0 14px 0; color: var(--text-muted, inherit); line-height: 1.5;">
+			<p class="cbi-section-descr" style="margin: 0 0 14px 0; color: var(--text-muted, inherit); line-height: 1.5; font-size: 13px;">
 				<%:系统将下载最新的无字体极简版（dist-no-fonts.zip）并重新部署至目标目录：%>
-				<code id="update_target_label" style="background: var(--surface-sunken, rgba(128, 128, 128, 0.12)); padding: 2px 6px; border-radius: 4px; font-family: var(--font-mono, monospace); font-weight: bold;">/etc/honk/zashboard</code>
+				<code id="update_target_label" style="background: var(--surface-sunken, var(--background-color-low, rgba(128, 128, 128, 0.12))); padding: 2px 6px; border-radius: 4px; font-family: var(--font-mono, monospace); font-weight: bold;">/etc/honk/zashboard</code>
 			</p>
 			
-			<div style="margin: 16px 0;">
-				<label style="font-weight: 600; display: block; margin-bottom: 10px;"><%:选择下载源：%></label>
-				<div style="display: flex; flex-direction: column; gap: 10px;">
-					<label class="modal-radio-option" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 6px; border: 1px solid var(--hairline, var(--border-color-low, rgba(255, 255, 255, 0.12))); background: var(--surface-sunken, rgba(128, 128, 128, 0.06)); cursor: pointer; transition: border-color 0.15s;">
+			<div style="margin: 14px 0;">
+				<label style="font-weight: 600; display: block; margin-bottom: 8px; font-size: 13px;"><%:选择下载源：%></label>
+				<div style="display: flex; flex-direction: column; gap: 8px;">
+					<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
 						<input type="radio" class="cbi-input-radio" name="modal_dl_source" value="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip" checked />
 						<span><strong>GitHub 官方 Release</strong> (dist-no-fonts.zip)</span>
 					</label>
-					<label class="modal-radio-option" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 6px; border: 1px solid var(--hairline, var(--border-color-low, rgba(255, 255, 255, 0.12))); background: var(--surface-sunken, rgba(128, 128, 128, 0.06)); cursor: pointer; transition: border-color 0.15s;">
+					<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
 						<input type="radio" class="cbi-input-radio" name="modal_dl_source" value="https://ghfast.top/https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip" />
 						<span><strong>国内高速镜像</strong> (ghfast.top 加速)</span>
 					</label>
@@ -238,9 +254,9 @@
 				<div class="zash-log-box" id="modal_log_box"></div>
 			</div>
 
-			<div style="margin-top: 22px; display: flex; justify-content: flex-end; gap: 10px;">
-				<button type="button" class="cbi-button cbi-button-neutral" id="btn_cancel_update"><%:取消%></button>
-				<button type="button" class="cbi-button cbi-button-action important" id="btn_confirm_update">↻ <%:开始更新%></button>
+			<div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+				<button type="button" class="cbi-button" id="btn_cancel_update"><%:取消%></button>
+				<button type="button" class="cbi-button cbi-button-action" id="btn_confirm_update"><%:开始更新%></button>
 			</div>
 		</div>
 	</div>
