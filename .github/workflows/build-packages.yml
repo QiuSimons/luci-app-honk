@@ -69,6 +69,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Remove vmlinux-btf dependency for CI
+        shell: bash
+        run: |
+          sed -i '/depends on KERNEL_DEBUG_INFO_BTF/d' honk/Makefile
+
       - name: Build packages
         uses: sbwml/openwrt-gh-action-sdk@go1.26
         env:
