@@ -164,28 +164,28 @@ function formatEditor(ed) {
 		var cursor = ed.getCursor();
 		var content = ed.getValue();
 
-		var formatCodePart = function(part) {
-			part = part.replace(/\s*->\s*/g, ' -> ');
-			part = part.replace(/\s*&&\s*/g, ' && ');
-			part = part.replace(/([^\s])\s*\{/g, '$1 {');
-			part = part.replace(/,([^\s])/g, ', $1');
+		var exprPrefixes = [
+			'geosite', 'geoip', 'keyword', 'full', 'suffix', 'regex', 'domain',
+			'pname', 'subtag', 'name', 'mac', 'dip', 'sip', 'dport', 'sport',
+			'l4proto', 'ipversion_prefer', 'fallback', 'qtype', 'qname',
+			'upstream', 'ip', 'tag', 'inlist'
+		];
+		var exprRegex = new RegExp('\\b(' + exprPrefixes.join('|') + ')\\s*:\\s*', 'g');
 
-			var exprPrefixes = ['geosite', 'geoip', 'keyword', 'full', 'suffix', 'regex', 'domain'];
-			var regex = new RegExp('\\b(' + exprPrefixes.join('|') + '):([^\\s\'"])', 'g');
-			part = part.replace(regex, '$1: $2');
-			return part;
+		var formatCodeSegment = function(str) {
+			str = str.replace(/\s*->\s*/g, ' -> ');
+			str = str.replace(/\s*&&\s*/g, ' && ');
+			str = str.replace(/([^\s])\s*\{/g, '$1 {');
+			str = str.replace(/\s*,\s*/g, ', ');
+			str = str.replace(exprRegex, '$1: ');
+			return str;
 		};
 
-		var lines = content.split('\n');
-		var formattedLines = lines.map(function(line) {
-			var trimmed = line.trim();
-			if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
-				return line.trimEnd();
-			}
+		var formatLineCode = function(lineStr) {
+			lineStr = lineStr.replace(/^(\s*[a-zA-Z0-9_-]+)\s*:\s*(\S.*)$/, '$1: $2');
+			lineStr = lineStr.replace(/^(\s*[a-zA-Z0-9_-]+)\s*:\s*$/, '$1:');
 
-			line = line.replace(/^(\s*[a-zA-Z0-9_-]+):([^\s])/, '$1: $2');
-
-			var quoteParts = line.split(/(['"])/);
+			var quoteParts = lineStr.split(/(['"])/);
 			var inQuote = false;
 			var currentQuote = '';
 			for (var j = 0; j < quoteParts.length; j++) {
@@ -203,17 +203,50 @@ function formatEditor(ed) {
 					if (hashIdx !== -1) {
 						var codeSub = part.slice(0, hashIdx);
 						var commentSub = part.slice(hashIdx);
-						codeSub = formatCodePart(codeSub);
-						quoteParts[j] = codeSub + commentSub;
+						codeSub = formatCodeSegment(codeSub);
+						if (codeSub.length > 0 && !/\s$/.test(codeSub)) {
+							codeSub += ' ';
+						}
+						quoteParts[j] = codeSub + commentSub.trimEnd();
+						quoteParts.splice(j + 1);
 						break;
 					} else {
-						quoteParts[j] = formatCodePart(part);
+						quoteParts[j] = formatCodeSegment(part);
 					}
 				}
 			}
-			line = quoteParts.join('');
+			return quoteParts.join('').trimEnd();
+		};
 
-			return line.trimEnd();
+		var lines = content.split('\n');
+		var formattedLines = lines.map(function(line) {
+			var trimmed = line.trim();
+			if (!trimmed) {
+				return '';
+			}
+
+			if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
+				var prefix = trimmed.startsWith('//') ? '//' : '#';
+				var afterComment = trimmed.slice(prefix.length);
+
+				var kvMatch = afterComment.match(/^(\s*)([a-zA-Z0-9_-]+)\s*:\s*(.*)$/);
+				if (kvMatch) {
+					var space = kvMatch[1];
+					var key = kvMatch[2];
+					var val = kvMatch[3].trim();
+					return (line.match(/^\s*/)[0] + prefix + space + key + ': ' + val).trimEnd();
+				}
+
+				if (afterComment.indexOf('->') !== -1 || afterComment.indexOf('&&') !== -1) {
+					var leadingWs = line.match(/^\s*/)[0];
+					var formattedCommentCode = formatLineCode(afterComment);
+					return (leadingWs + prefix + (afterComment.startsWith(' ') ? ' ' : '') + formattedCommentCode.trim()).trimEnd();
+				}
+
+				return line.trimEnd();
+			}
+
+			return formatLineCode(line);
 		});
 
 		ed.setValue(formattedLines.join('\n'));
@@ -225,7 +258,46 @@ function formatEditor(ed) {
 	});
 }
 
+function bindCodeMirrorToMap(m, onSaveCallback) {
+	if (!m || m._cmHooked) return;
+	m._cmHooked = true;
+
+	var origSave = m.save;
+	m.save = function() {
+		var root = m.root || document.getElementById('cbi-' + m.config) || document;
+		root.querySelectorAll('textarea').forEach(function(ta) {
+			if (ta._editor) {
+				ta.value = ta._editor.getValue();
+				ta._editor.save();
+			}
+		});
+		return origSave.apply(this, arguments);
+	};
+
+	var origRenderContents = m.renderContents;
+	m.renderContents = function() {
+		return origRenderContents.apply(this, arguments).then(function(mapNode) {
+			setTimeout(function() {
+				var target = mapNode || m.root || document.getElementById('cbi-' + m.config) || document;
+				target.querySelectorAll('textarea').forEach(function(ta) {
+					initCodeMirror(ta, onSaveCallback).then(function(editor) {
+						setTimeout(function() {
+							editor.refresh();
+						}, 50);
+					});
+				});
+			}, 30);
+			return mapNode;
+		});
+	};
+}
+
 function initCodeMirror(textarea, onSaveCallback) {
+	if (textarea.dataset.cmInitialized === 'true' || textarea._editor) {
+		return Promise.resolve(textarea._editor);
+	}
+	textarea.dataset.cmInitialized = 'true';
+
 	return ensureCodeMirror().then(function(CodeMirror) {
 		var editor = CodeMirror.fromTextArea(textarea, {
 			mode: 'dae',
@@ -240,6 +312,7 @@ function initCodeMirror(textarea, onSaveCallback) {
 			foldGutter: true,
 			gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
 		});
+		textarea._editor = editor;
 
 		editor.on('inputRead', function(cm, change) {
 			if (change.origin !== '+input') return;
@@ -267,24 +340,38 @@ function initCodeMirror(textarea, onSaveCallback) {
 			'type': 'button',
 			'class': 'btn cbi-button cm-format-btn',
 			'click': function() {
-				formatEditor(editor);
-				syncTextarea();
+				try {
+					formatEditor(editor);
+					syncTextarea();
+					var isZh = (window.L && window.L.env && window.L.env.lang && window.L.env.lang.indexOf('zh') !== -1);
+					var formattedText = '✓ ' + (isZh ? '已格式化' : _('Formatted'));
+					formatBtn.textContent = formattedText;
+					formatBtn.classList.add('cbi-button-positive');
+					clearTimeout(formatBtn._resetTimer);
+					formatBtn._resetTimer = setTimeout(function() {
+						formatBtn.textContent = _('Format Code');
+						formatBtn.classList.remove('cbi-button-positive');
+					}, 1500);
+				} catch (e) {
+					console.error('Format failed:', e);
+					ui.addNotification(null, E('p', _('Failed to format code: ') + (e.message || e)), 'error');
+				}
 			}
 		}, _('Format Code'));
 
 		var toolbar = E('div', { 'class': 'honk-editor-toolbar' }, [ formatBtn ]);
 
 		var wrapper = editor.getWrapperElement();
-		wrapper.parentNode.insertBefore(toolbar, wrapper);
+		if (!wrapper.previousElementSibling || !wrapper.previousElementSibling.classList.contains('honk-editor-toolbar')) {
+			wrapper.parentNode.insertBefore(toolbar, wrapper);
+		}
 
-		var form = textarea.closest('form');
-		if (form && !form.dataset.cmHooked) {
-			form.addEventListener('submit', function() {
-				formatEditor(editor);
-				editor.save();
-				syncTextarea();
-			});
-			form.dataset.cmHooked = 'true';
+		var mapEl = textarea.closest('.cbi-map');
+		if (mapEl) {
+			var mapInst = (window.L && window.L.dom) ? window.L.dom.findClassInstance(mapEl) : null;
+			if (mapInst && !mapInst._cmHooked) {
+				bindCodeMirrorToMap(mapInst, onSaveCallback);
+			}
 		}
 
 		return editor;
@@ -360,5 +447,6 @@ return baseclass.extend({
 	ensureCodeMirror: ensureCodeMirror,
 	formatEditor: formatEditor,
 	initCodeMirror: initCodeMirror,
+	bindCodeMirrorToMap: bindCodeMirrorToMap,
 	renderStatusHeader: renderStatusHeader
 });

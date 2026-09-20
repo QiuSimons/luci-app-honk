@@ -94,6 +94,62 @@ function get_config_file_path() {
 	return "/etc/honk/config.dae";
 }
 
+function remove_clash_api_blocks(content) {
+	let lines = split(content, "\n");
+	let new_lines = [];
+	let in_block = false;
+	let depth = 0;
+
+	for (let idx, line in lines) {
+		let trimmed = trim(line);
+		if (!in_block && match(trimmed, /^[#\/]*\s*clash_api\s*\{/)) {
+			in_block = true;
+			depth = 1;
+			continue;
+		}
+
+		if (in_block) {
+			if (match(trimmed, /\{/)) depth++;
+			if (match(trimmed, /\}/)) depth--;
+			if (depth <= 0) {
+				in_block = false;
+			}
+			continue;
+		}
+
+		push(new_lines, line);
+	}
+	return join("\n", new_lines);
+}
+
+function remove_commented_experimental_blocks(content) {
+	let lines = split(content, "\n");
+	let new_lines = [];
+	let in_block = false;
+	let depth = 0;
+
+	for (let idx, line in lines) {
+		let trimmed = trim(line);
+		if (!in_block && match(trimmed, /^[#\/]+\s*experimental\s*\{/)) {
+			in_block = true;
+			depth = 1;
+			continue;
+		}
+
+		if (in_block) {
+			if (match(trimmed, /\{/)) depth++;
+			if (match(trimmed, /\}/)) depth--;
+			if (depth <= 0) {
+				in_block = false;
+			}
+			continue;
+		}
+
+		push(new_lines, line);
+	}
+	return join("\n", new_lines);
+}
+
 return {
 	"luci.honk": {
 		status: {
@@ -253,51 +309,24 @@ return {
 "    }\n" +
 "}\n";
 
-				let new_content;
-
-				// Check if there is a commented-out clash_api block
-				if (match(content, /[#\/]+\s*clash_api\s*\{/)) {
-					// Uncomment experimental/clash_api comments
-					let lines = split(content, "\n");
-					let in_commented_block = false;
-					let brace_depth = 0;
-					let mod_lines = [];
-
-					for (let idx, line in lines) {
-						let stripped = match(line, /^\s*[#\/]+\s*(.*)$/);
-						if (stripped) {
-							let text = stripped[1];
-							if (match(text, /\bclash_api\s*\{/)) {
-								in_commented_block = true;
-								brace_depth = 1;
-								push(mod_lines, "    clash_api {");
-								continue;
-							} else if (in_commented_block) {
-								if (match(text, /\{/)) brace_depth++;
-								if (match(text, /\}/)) brace_depth--;
-								push(mod_lines, "        " + text);
-								if (brace_depth <= 0) {
-									in_commented_block = false;
-								}
-								continue;
-							}
-						}
-						push(mod_lines, line);
-					}
-					new_content = join("\n", mod_lines);
-				} else if (match(content, /\bexperimental\s*\{/)) {
-					// Insert clash_api into experimental block
-					let api_inner =
+				let api_inner =
 "    clash_api {\n" +
 "        external_controller: '0.0.0.0:9090'\n" +
 "        external_ui: '/etc/honk/zashboard'\n" +
 "        secret: ''\n" +
 "        default_mode: 'Rule'\n" +
 "    }\n";
-					new_content = replace(content, /experimental\s*\{/, "experimental {\n" + api_inner);
+
+				let cleaned = remove_clash_api_blocks(content);
+				cleaned = replace(cleaned, /experimental\s*\{\s*\}/, "experimental {\n}");
+
+				let has_active_exp = match(cleaned, /(^|\n)[ \t]*experimental\s*\{/);
+				let new_content;
+				if (has_active_exp) {
+					new_content = replace(cleaned, /(experimental\s*\{[^\n]*\n?)/, "$1" + api_inner);
 				} else {
-					// Append experimental block at end
-					new_content = content + "\n\n" + default_block;
+					cleaned = remove_commented_experimental_blocks(cleaned);
+					new_content = rtrim(cleaned, "\r\n\t ") + "\n\n" + default_block;
 				}
 
 				writefile(config_file, new_content);

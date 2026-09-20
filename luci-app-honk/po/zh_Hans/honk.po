@@ -100,4 +100,10 @@ msgstr "状态"
 msgid "Running Status"
 msgstr "运行状态"
 
+msgid "Formatted"
+msgstr "已格式化"
+
+msgid "Failed to format code: "
+msgstr "格式化代码失败："
+
 

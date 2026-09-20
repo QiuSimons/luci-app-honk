@@ -29,17 +29,8 @@ return view.extend({
 			return honk.writeFile('/etc/honk/config.d/route.dae', formvalue);
 		};
 
-		return m.render().then(function(mapNode) {
-			setTimeout(function() {
-				var textareas = mapNode.querySelectorAll('textarea');
-				textareas.forEach(function(ta) {
-					honk.initCodeMirror(ta).then(function(editor) {
-						setTimeout(function() { editor.refresh(); }, 100);
-					});
-				});
-			}, 50);
-			return mapNode;
-		});
+		honk.bindCodeMirrorToMap(m);
+		return m.render();
 	},
 
 	handleSaveApply: function(ev, mode) {
