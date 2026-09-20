@@ -1,0 +1,745 @@
+<style>
+	.zash-container {
+		margin-top: 10px;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+		color: #cdd6f4;
+	}
+	.zash-card {
+		background: #1e1e2e !important;
+		border: 1px solid #313244 !important;
+		border-radius: 10px;
+		padding: 24px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		margin-bottom: 20px;
+		color: #cdd6f4 !important;
+	}
+	.zash-card h3 {
+		color: #ffffff !important;
+	}
+	.zash-card p {
+		color: #a6adc8 !important;
+	}
+	.zash-card label {
+		color: #cdd6f4 !important;
+	}
+	.zash-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 10px 16px;
+		background: #181825;
+		color: #cdd6f4;
+		border-radius: 8px 8px 0 0;
+		border: 1px solid #313244;
+		border-bottom: none;
+	}
+	.zash-header-title {
+		font-size: 15px;
+		font-weight: 600;
+		color: #ffffff;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.zash-badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 2px 8px;
+		font-size: 11px;
+		font-weight: 600;
+		border-radius: 9999px;
+		line-height: 1.5;
+	}
+	.badge-success {
+		background: rgba(16, 185, 129, 0.2);
+		color: #10b981;
+		border: 1px solid rgba(16, 185, 129, 0.3);
+	}
+	.badge-danger {
+		background: rgba(239, 68, 68, 0.2);
+		color: #ef4444;
+		border: 1px solid rgba(239, 68, 68, 0.3);
+	}
+	.badge-info {
+		background: rgba(99, 102, 241, 0.2);
+		color: #818cf8;
+		border: 1px solid rgba(99, 102, 241, 0.3);
+	}
+	.zash-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.zash-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 6px 14px;
+		font-size: 12px;
+		font-weight: 500;
+		border-radius: 6px;
+		border: 1px solid #45475a;
+		background: #313244;
+		color: #cdd6f4;
+		cursor: pointer;
+		text-decoration: none;
+		transition: all 0.2s;
+	}
+	.zash-btn:hover {
+		background: #45475a;
+		color: #ffffff;
+		text-decoration: none;
+	}
+	.zash-btn-primary {
+		background: #6366f1;
+		border-color: #4f46e5;
+		color: #ffffff;
+	}
+	.zash-btn-primary:hover {
+		background: #4f46e5;
+		color: #ffffff;
+	}
+	.zash-btn-success {
+		background: #10b981;
+		border-color: #059669;
+		color: #ffffff;
+	}
+	.zash-btn-success:hover {
+		background: #059669;
+		color: #ffffff;
+	}
+	.zash-iframe-wrap {
+		position: relative;
+		width: 100%;
+		border: 1px solid #313244;
+		border-radius: 0 0 8px 8px;
+		overflow: hidden;
+		background: #181825;
+	}
+	.zash-iframe {
+		width: 100%;
+		height: calc(100vh - 200px);
+		min-height: 650px;
+		border: none;
+		display: block;
+	}
+	.zash-iframe.fullscreen {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		z-index: 999999;
+	}
+	.zash-notice-box {
+		padding: 12px 16px;
+		border-radius: 6px;
+		margin-bottom: 15px;
+		font-size: 13px;
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+	}
+	.notice-warning {
+		background: rgba(249, 226, 175, 0.12);
+		border: 1px solid rgba(249, 226, 175, 0.3);
+		color: #f9e2af;
+	}
+	.notice-info {
+		background: rgba(137, 180, 250, 0.12);
+		border: 1px solid rgba(137, 180, 250, 0.3);
+		color: #89b4fa;
+	}
+	.zash-code-block {
+		background: #11111b;
+		color: #f8f8f2;
+		font-family: 'Fira Code', 'Monaco', monospace;
+		font-size: 12px;
+		line-height: 1.5;
+		padding: 14px;
+		border-radius: 6px;
+		overflow-x: auto;
+		margin: 12px 0;
+		border: 1px solid #313244;
+	}
+	.zash-log-box {
+		background: #11111b;
+		color: #a6e3a1;
+		font-family: 'Fira Code', 'Monaco', monospace;
+		font-size: 12px;
+		line-height: 1.4;
+		padding: 12px;
+		border-radius: 6px;
+		height: 180px;
+		overflow-y: auto;
+		border: 1px solid #313244;
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+	.zash-progress {
+		width: 100%;
+		height: 8px;
+		background: #313244;
+		border-radius: 4px;
+		overflow: hidden;
+		margin: 15px 0;
+		position: relative;
+	}
+	.zash-progress-bar {
+		height: 100%;
+		background: linear-gradient(90deg, #6366f1, #10b981);
+		width: 0%;
+		transition: width 0.3s ease;
+	}
+	.zash-progress-bar.animated {
+		animation: progress-pulse 1.5s infinite linear;
+		width: 100%;
+		background: linear-gradient(90deg, #6366f1 0%, #10b981 50%, #6366f1 100%);
+		background-size: 200% 100%;
+	}
+	@keyframes progress-pulse {
+		0% { background-position: 200% 0; }
+		100% { background-position: -200% 0; }
+	}
+	.zash-meta-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 12px;
+		margin: 15px 0;
+	}
+	.zash-meta-item {
+		background: #181825;
+		padding: 12px 16px;
+		border-radius: 8px;
+		border: 1px solid #313244;
+	}
+	.zash-meta-title {
+		font-size: 11px;
+		color: #a6adc8;
+		margin-bottom: 4px;
+		text-transform: uppercase;
+		font-weight: 500;
+	}
+	.zash-meta-val {
+		font-size: 13px;
+		font-weight: 600;
+		color: #ffffff;
+	}
+	.zash-modal-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		background: rgba(0, 0, 0, 0.75);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 10000;
+	}
+	.zash-modal-box {
+		background: #1e1e2e !important;
+		border: 1px solid #45475a !important;
+		border-radius: 12px;
+		padding: 24px;
+		width: 500px;
+		max-width: 90vw;
+		margin: 0;
+		box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+		color: #cdd6f4 !important;
+	}
+	.zash-modal-box h4 {
+		color: #ffffff !important;
+		margin: 0;
+		font-size: 16px;
+		font-weight: 600;
+	}
+	.zash-modal-box p {
+		color: #bac2de !important;
+		font-size: 13px;
+		line-height: 1.6;
+	}
+	.zash-modal-box label {
+		color: #cdd6f4 !important;
+	}
+	.zash-modal-box input[type="radio"] {
+		accent-color: #6366f1;
+	}
+	.zash-modal-box code {
+		background: #11111b !important;
+		border: 1px solid #313244 !important;
+		color: #a6e3a1 !important;
+		padding: 2px 6px;
+		border-radius: 4px;
+	}
+</style>
+
+<div class="zash-container" id="zash_app">
+	<!-- Loading state -->
+	<div class="zash-card" id="state_loading" style="text-align: center; padding: 40px;">
+		<p><em style="font-size: 14px; color: #bac2de;"><%:正在检测 Zashboard 与 Clash API 配置...%></em></p>
+	</div>
+
+	<!-- State 1: Clash API Not Configured -->
+	<div class="zash-card" id="state_unconfigured" style="display: none;">
+		<div style="margin-bottom: 12px;">
+			<h3 style="margin: 0; font-size: 18px; color: #ffffff !important;"><%:Zashboard / Clash API 未配置%></h3>
+		</div>
+		<p style="color: #bac2de !important; font-size: 13px; line-height: 1.6;">
+			<%:HONK 尚未在配置文件中启用 Clash API。Zashboard 控制面板需要依赖 Clash API 提供的外部控制器端口与面板静态文件路径。%>
+		</p>
+
+		<div class="notice-warning zash-notice-box">
+			<span style="font-weight: bold; font-size: 14px;">!</span>
+			<div>
+				<%:请在【全局设置】的配置文件中添加或取消注释 experimental.clash_api 语法块，并确保配置了 external_controller 和 external_ui。%>
+			</div>
+		</div>
+
+		<div style="margin-top: 10px;">
+			<strong style="font-size: 13px; color: #cdd6f4;"><%:参考配置示例（/etc/honk/config.dae）：%></strong>
+			<div class="zash-code-block">experimental {
+    clash_api {
+        external_controller: '0.0.0.0:9090'
+        external_ui: '/etc/honk/zashboard'
+        secret: ''
+        default_mode: 'Rule'
+    }
+}</div>
+		</div>
+
+		<div style="margin-top: 18px; display: flex; gap: 10px; align-items: center;">
+			<a href="<%=url('admin/services/honk/global')%>" class="zash-btn zash-btn-primary" style="padding: 8px 16px;">
+				<%:前往【全局设置】手动配置%>
+			</a>
+			<button type="button" class="zash-btn zash-btn-success" id="btn_quick_enable" style="padding: 8px 16px;">
+				<%:一键启用默认 Clash API 配置%>
+			</button>
+			<span id="quick_enable_msg" style="font-size: 12px; color: #10b981; margin-left: 8px;"></span>
+		</div>
+	</div>
+
+	<!-- State 2: Missing UI Files (Download Wizard) -->
+	<div class="zash-card" id="state_missing_ui" style="display: none;">
+		<div style="margin-bottom: 12px;">
+			<h3 style="margin: 0; font-size: 18px; color: #ffffff !important;"><%:未检测到 Zashboard 面板文件%></h3>
+		</div>
+		<p style="color: #bac2de !important; font-size: 13px; line-height: 1.6;">
+			<%:Clash API 配置已就绪，但设定的外部控制面板目录中缺少面板文件。您可以点击下方按钮，使用 OpenWrt 原生轻量解压直接在线下载部署。%>
+		</p>
+
+		<!-- Configuration summary items -->
+		<div class="zash-meta-grid">
+			<div class="zash-meta-item">
+				<div class="zash-meta-title"><%:目标安装目录 (external_ui)%></div>
+				<div class="zash-meta-val" id="meta_ui_dir">/etc/honk/zashboard</div>
+			</div>
+			<div class="zash-meta-item">
+				<div class="zash-meta-title"><%:监听地址与端口%></div>
+				<div class="zash-meta-val" id="meta_controller">0.0.0.0:9090</div>
+			</div>
+			<div class="zash-meta-item">
+				<div class="zash-meta-title"><%:API 认证密钥%></div>
+				<div class="zash-meta-val" id="meta_secret"><%:（未设置）%></div>
+			</div>
+		</div>
+
+		<!-- Download source selection -->
+		<div style="margin: 18px 0;">
+			<label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 8px;">
+				<%:下载版本与源（专为 OpenWrt 优化的无字体极简版，仅约 1MB）：%>
+			</label>
+			<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+				<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+					<input type="radio" name="dl_source" value="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip" checked />
+					<span><strong>GitHub 官方 Release</strong> (dist-no-fonts.zip, 极简推荐)</span>
+				</label>
+				<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+					<input type="radio" name="dl_source" value="https://ghfast.top/https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip" />
+					<span><strong>国内高速镜像 1</strong> (ghfast.top 加速)</span>
+				</label>
+				<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+					<input type="radio" name="dl_source" value="https://ghproxy.net/https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip" />
+					<span><strong>国内高速镜像 2</strong> (ghproxy.net 加速)</span>
+				</label>
+				<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+					<input type="radio" name="dl_source" value="custom" id="radio_custom_url" />
+					<span><strong><%:自定义 URL%></strong></span>
+				</label>
+			</div>
+			<div id="custom_url_wrap" style="display: none; margin-top: 8px;">
+				<input type="text" id="custom_dl_url" class="cbi-input-text" style="width: 100%; font-family: monospace;" placeholder="https://.../dist-no-fonts.zip" />
+			</div>
+		</div>
+
+		<!-- Progress bar -->
+		<div id="dl_progress_container" style="display: none;">
+			<div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+				<span id="dl_status_label"><%:准备下载...%></span>
+			</div>
+			<div class="zash-progress">
+				<div class="zash-progress-bar animated" id="dl_bar"></div>
+			</div>
+			<div class="zash-log-box" id="dl_log_box"></div>
+		</div>
+
+		<div style="margin-top: 20px;">
+			<button type="button" class="zash-btn zash-btn-primary" id="btn_start_download" style="padding: 9px 20px; font-size: 13px;">
+				<%:开始下载并安装 Zashboard%>
+			</button>
+		</div>
+	</div>
+
+	<!-- State 3: Ready, Embedded Dashboard -->
+	<div id="state_ready" style="display: none;">
+		<!-- HTTPS mixed content alert -->
+		<div id="https_alert" class="notice-warning zash-notice-box" style="display: none;">
+			<span style="font-weight: bold; font-size: 14px;">!</span>
+			<div style="flex: 1;">
+				<strong><%:检测到当前通过 HTTPS 访问 LuCI：%></strong>
+				<%:现代浏览器可能会阻止在 HTTPS 页面内直接加载 HTTP 协议的 Clash API 面板。如页面无法正常显示，请直接点击右侧按钮在新标签页中打开。%>
+			</div>
+			<a id="btn_https_open" href="#" target="_blank" class="zash-btn zash-btn-primary" style="margin-left: 10px; white-space: nowrap;">
+				↗ <%:在新标签页打开%>
+			</a>
+		</div>
+
+		<!-- Honk service status notice -->
+		<div id="honk_stop_alert" class="notice-warning zash-notice-box" style="display: none;">
+			<span style="font-weight: bold; font-size: 14px;">!</span>
+			<div style="flex: 1;">
+				<strong><%:HONK 服务当前未运行：%></strong>
+				<%:Clash API 端口（<span class="honk_port_label">9090</span>）尚未监听。面板将在 HONK 启动后开始同步流量与节点数据。%>
+			</div>
+			<a href="<%=url('admin/services/honk/global')%>" class="zash-btn zash-btn-primary" style="margin-left: 10px;">
+				<%:前往启动 HONK%>
+			</a>
+		</div>
+
+		<!-- Dashboard Header Toolbar -->
+		<div class="zash-header">
+			<div class="zash-header-title">
+				<span>Zashboard</span>
+				<span id="status_service_pill" class="zash-badge badge-success"><%:服务运行中%></span>
+				<span id="status_endpoint_pill" class="zash-badge badge-info" style="font-family: monospace;"></span>
+			</div>
+			<div class="zash-actions">
+				<button type="button" class="zash-btn" id="btn_update_dashboard" title="<%:更新至最新版 Zashboard%>">
+					↻ <%:更新面板%>
+				</button>
+				<button type="button" class="zash-btn" id="btn_refresh_iframe" title="<%:刷新面板内容%>">
+					↺ <%:刷新%>
+				</button>
+				<button type="button" class="zash-btn" id="btn_toggle_fullscreen" title="<%:切换全屏显示%>">
+					⛶ <%:全屏%>
+				</button>
+				<a id="btn_external_open" href="#" target="_blank" class="zash-btn zash-btn-primary" title="<%:在新标签页中独立打开%>">
+					↗ <%:新标签页%>
+				</a>
+			</div>
+		</div>
+
+		<!-- Embedded Iframe -->
+		<div class="zash-iframe-wrap">
+			<iframe id="zash_iframe" class="zash-iframe" src="about:blank" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+		</div>
+	</div>
+
+	<!-- Update Modal Dialog -->
+	<div id="update_modal" class="zash-modal-backdrop" style="display: none;">
+		<div class="zash-modal-box">
+			<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+				<h4 style="margin: 0; font-size: 16px; color: #ffffff !important;">↻ <%:更新 Zashboard 面板%></h4>
+				<button type="button" id="btn_close_update_modal" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #a6adc8; line-height: 1;">&times;</button>
+			</div>
+			<p style="font-size: 13px; color: #bac2de !important; margin-bottom: 14px; line-height: 1.6;">
+				<%:系统将下载最新的无字体极简版（dist-no-fonts.zip）并重新部署至目标目录：%>
+				<code id="update_target_label" style="font-size: 12px; font-family: monospace;">/etc/honk/zashboard</code>
+			</p>
+			
+			<div style="margin: 14px 0;">
+				<label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 8px; color: #cdd6f4 !important;"><%:选择下载源：%></label>
+				<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+					<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #cdd6f4 !important;">
+						<input type="radio" name="modal_dl_source" value="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip" checked />
+						<span style="color: #cdd6f4 !important;"><strong>GitHub 官方 Release</strong> (dist-no-fonts.zip)</span>
+					</label>
+					<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #cdd6f4 !important;">
+						<input type="radio" name="modal_dl_source" value="https://ghfast.top/https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip" />
+						<span style="color: #cdd6f4 !important;"><strong>国内高速镜像</strong> (ghfast.top 加速)</span>
+					</label>
+				</div>
+			</div>
+
+			<div id="modal_progress_wrap" style="display: none; margin-top: 14px;">
+				<div class="zash-progress">
+					<div class="zash-progress-bar animated"></div>
+				</div>
+				<div class="zash-log-box" id="modal_log_box" style="height: 130px;"></div>
+			</div>
+
+			<div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+				<button type="button" class="zash-btn" id="btn_cancel_update"><%:取消%></button>
+				<button type="button" class="zash-btn zash-btn-primary" id="btn_confirm_update">↻ <%:开始更新%></button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript">//<![CDATA[
+(function() {
+	var currentInfo = null;
+	var pollTimer = null;
+	var iframeLoaded = false;
+
+	function el(id) {
+		return document.getElementById(id);
+	}
+
+	function showState(stateName) {
+		el('state_loading').style.display = (stateName === 'loading') ? 'block' : 'none';
+		el('state_unconfigured').style.display = (stateName === 'unconfigured') ? 'block' : 'none';
+		el('state_missing_ui').style.display = (stateName === 'missing_ui') ? 'block' : 'none';
+		el('state_ready').style.display = (stateName === 'ready') ? 'block' : 'none';
+	}
+
+	function getTargetHost(configHost) {
+		if (!configHost || configHost === '0.0.0.0' || configHost === '::' || configHost === '[::]') {
+			return window.location.hostname;
+		}
+		return configHost;
+	}
+
+	function buildZashboardUrl(info) {
+		var targetHost = getTargetHost(info.host);
+		var port = info.port || '9090';
+		var secret = info.secret || '';
+		var protocol = 'http';
+
+		var query = 'hostname=' + encodeURIComponent(targetHost) +
+			'&port=' + encodeURIComponent(port) +
+			'&protocol=' + encodeURIComponent(protocol);
+		if (secret) {
+			query += '&secret=' + encodeURIComponent(secret);
+		}
+		return protocol + '://' + targetHost + ':' + port + '/ui/?' + query + '#/setup?' + query;
+	}
+
+	function loadZashboardInfo() {
+		XHR.get('<%=url("admin/services/honk/zashboard_info")%>', null, function(xhr, data) {
+			if (!data) {
+				showState('unconfigured');
+				return;
+			}
+			currentInfo = data;
+
+			if (!data.configured) {
+				showState('unconfigured');
+				return;
+			}
+
+			if (!data.has_ui) {
+				el('meta_ui_dir').innerText = data.external_ui || '/etc/honk/zashboard';
+				el('meta_controller').innerText = data.external_controller || '0.0.0.0:9090';
+				el('meta_secret').innerText = data.secret ? '<%:已设置 (隐藏)%>' : '<%:未设置（留空）%>';
+				showState('missing_ui');
+				return;
+			}
+
+			// Ready state
+			showState('ready');
+			setupReadyDashboard(data);
+		});
+	}
+
+	function setupReadyDashboard(info) {
+		var targetHost = getTargetHost(info.host);
+		var port = info.port || '9090';
+		var fullUrl = buildZashboardUrl(info);
+
+		// Status pill
+		var pill = el('status_service_pill');
+		if (info.running) {
+			pill.className = 'zash-badge badge-success';
+			pill.innerText = '<%:HONK: 运行中%>';
+			el('honk_stop_alert').style.display = 'none';
+		} else {
+			pill.className = 'zash-badge badge-danger';
+			pill.innerText = '<%:HONK: 未运行%>';
+			el('honk_stop_alert').style.display = 'flex';
+			var labels = document.querySelectorAll('.honk_port_label');
+			labels.forEach(function(item) { item.innerText = port; });
+		}
+
+		el('status_endpoint_pill').innerText = targetHost + ':' + port;
+
+		// External open buttons
+		el('btn_external_open').href = fullUrl;
+		el('btn_https_open').href = fullUrl;
+
+		// Check HTTPS mixed content warning
+		if (window.location.protocol === 'https:') {
+			el('https_alert').style.display = 'flex';
+		} else {
+			el('https_alert').style.display = 'none';
+		}
+
+		// Load iframe only if not loaded or src changed
+		var iframe = el('zash_iframe');
+		if (!iframeLoaded || iframe.src !== fullUrl) {
+			iframe.src = fullUrl;
+			iframeLoaded = true;
+		}
+
+		// Update modal target
+		el('update_target_label').innerText = info.external_ui || '/etc/honk/zashboard';
+	}
+
+	// Radio custom URL toggle
+	var radios = document.getElementsByName('dl_source');
+	for (var i = 0; i < radios.length; i++) {
+		radios[i].addEventListener('change', function() {
+			el('custom_url_wrap').style.display = (el('radio_custom_url').checked) ? 'block' : 'none';
+		});
+	}
+
+	// Start download handler
+	function triggerDownload(url, logBoxEl, progressWrapEl, onComplete) {
+		progressWrapEl.style.display = 'block';
+		logBoxEl.innerText = '<%:正在提交下载任务...%>\n';
+
+		XHR.get('<%=url("admin/services/honk/download_zashboard")%>', { url: url }, function(xhr, resp) {
+			if (!resp || !resp.success) {
+				logBoxEl.innerText += '<%:错误：发起下载任务失败！%>\n';
+				return;
+			}
+
+			// Start polling download status
+			if (pollTimer) clearInterval(pollTimer);
+			pollTimer = setInterval(function() {
+				XHR.get('<%=url("admin/services/honk/download_status")%>', null, function(xhr, data) {
+					if (!data) return;
+
+					if (data.log) {
+						logBoxEl.innerText = data.log;
+						logBoxEl.scrollTop = logBoxEl.scrollHeight;
+					}
+
+					if (data.status === 'SUCCESS') {
+						clearInterval(pollTimer);
+						pollTimer = null;
+						logBoxEl.innerText += '\n[OK] <%:安装完成！正在加载面板...%>\n';
+						setTimeout(function() {
+							if (onComplete) onComplete();
+							loadZashboardInfo();
+						}, 1500);
+					} else if (data.status === 'FAILED') {
+						clearInterval(pollTimer);
+						pollTimer = null;
+						logBoxEl.innerText += '\n[FAIL] <%:安装失败，请检查上方日志或更换镜像源。%>\n';
+					}
+				});
+			}, 1000);
+		});
+	}
+
+	// Main download button
+	el('btn_start_download').onclick = function() {
+		var selectedUrl = '';
+		var checkedRadio = document.querySelector('input[name="dl_source"]:checked');
+		if (checkedRadio) {
+			if (checkedRadio.value === 'custom') {
+				selectedUrl = el('custom_dl_url').value.trim();
+				if (!selectedUrl) {
+					alert('<%:请输入有效的自定义下载链接！%>');
+					return;
+				}
+			} else {
+				selectedUrl = checkedRadio.value;
+			}
+		}
+
+		el('btn_start_download').disabled = true;
+		el('btn_start_download').innerText = '<%:正在处理...%>';
+		triggerDownload(selectedUrl, el('dl_log_box'), el('dl_progress_container'), function() {
+			el('btn_start_download').disabled = false;
+			el('btn_start_download').innerText = '<%:开始下载并安装 Zashboard%>';
+		});
+	};
+
+	// Quick enable Clash API button
+	el('btn_quick_enable').onclick = function() {
+		var btn = el('btn_quick_enable');
+		btn.disabled = true;
+		btn.innerText = '<%:正在开启并重启 HONK...%>';
+		XHR.get('<%=url("admin/services/honk/enable_clash_api")%>', null, function(xhr, resp) {
+			btn.disabled = false;
+			btn.innerText = '<%:一键启用默认 Clash API 配置%>';
+			if (resp && resp.success) {
+				el('quick_enable_msg').innerText = '<%:已成功启用！正在重启服务并初始化面板...%>';
+				setTimeout(function() {
+					loadZashboardInfo();
+				}, 2500);
+			} else {
+				alert('<%:启用失败：%> ' + (resp ? resp.message : '未知错误'));
+			}
+		});
+	};
+
+	// Toolbar: Refresh iframe
+	el('btn_refresh_iframe').onclick = function() {
+		var iframe = el('zash_iframe');
+		if (iframe && currentInfo) {
+			iframe.src = buildZashboardUrl(currentInfo);
+		}
+	};
+
+	// Toolbar: Toggle fullscreen
+	el('btn_toggle_fullscreen').onclick = function() {
+		var iframe = el('zash_iframe');
+		if (!iframe) return;
+		if (!document.fullscreenElement) {
+			if (iframe.requestFullscreen) {
+				iframe.requestFullscreen();
+			} else if (iframe.webkitRequestFullscreen) {
+				iframe.webkitRequestFullscreen();
+			}
+		} else {
+			if (document.exitFullscreen) {
+				document.exitFullscreen();
+			}
+		}
+	};
+
+	// Update modal logic
+	el('btn_update_dashboard').onclick = function() {
+		el('modal_progress_wrap').style.display = 'none';
+		el('modal_log_box').innerText = '';
+		el('btn_confirm_update').disabled = false;
+		el('update_modal').style.display = 'flex';
+	};
+
+	el('btn_close_update_modal').onclick = function() {
+		el('update_modal').style.display = 'none';
+	};
+
+	el('btn_cancel_update').onclick = function() {
+		el('update_modal').style.display = 'none';
+	};
+
+	el('btn_confirm_update').onclick = function() {
+		var checkedRadio = document.querySelector('input[name="modal_dl_source"]:checked');
+		var url = checkedRadio ? checkedRadio.value : 'https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip';
+
+		el('btn_confirm_update').disabled = true;
+		triggerDownload(url, el('modal_log_box'), el('modal_progress_wrap'), function() {
+			el('update_modal').style.display = 'none';
+			el('btn_confirm_update').disabled = false;
+		});
+	};
+
+	// Initial load
+	loadZashboardInfo();
+})();
+//]]></script>
