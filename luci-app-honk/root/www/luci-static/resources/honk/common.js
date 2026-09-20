@@ -99,9 +99,12 @@ function ensureEditorStyles() {
 	var style = document.createElement('style');
 	style.id = 'honk-editor-custom-style';
 	style.textContent = [
-		'.honk-editor-toolbar { margin-bottom: 6px; margin-top: 2px; display: flex; align-items: center; justify-content: flex-start; }',
-		'.cm-format-btn { margin: 0; cursor: pointer; }',
-		'.cbi-value:has(.CodeMirror) .cbi-value-field { flex: 1 1 0% !important; min-width: 0 !important; }',
+		'.honk-status-field { display: inline-flex !important; align-items: center !important; justify-content: flex-start !important; gap: 16px !important; flex-wrap: wrap !important; min-height: 32px !important; }',
+		'.honk-editor-toolbar { margin-bottom: 6px !important; margin-top: 0 !important; display: flex !important; align-items: center !important; justify-content: flex-start !important; }',
+		'.cm-format-btn { margin: 0 !important; cursor: pointer !important; }',
+		'.cbi-value:has(.CodeMirror) { align-items: flex-start !important; }',
+		'.cbi-value:has(.CodeMirror) > .cbi-value-title { padding-top: 5px !important; }',
+		'.cbi-value:has(.CodeMirror) .cbi-value-field { flex: 1 1 0% !important; min-width: 0 !important; width: auto !important; }',
 		'.CodeMirror {',
 		'	border: 1px solid var(--hairline, var(--border-color-medium, #ccc)) !important;',
 		'	border-radius: var(--radius-base, 4px);',
@@ -288,14 +291,13 @@ function initCodeMirror(textarea, onSaveCallback) {
 }
 
 function renderStatusHeader() {
-	var statusEl = E('p', { 'id': 'honk_status' }, [
-		E('em', {}, E('b', {}, _('Collecting data...')))
+	var statusEl = E('span', { 'id': 'honk_status', 'style': 'font-weight: 500;' }, [
+		E('em', {}, _('Collecting data...'))
 	]);
 
 	var reloadBtn = E('button', {
 		'type': 'button',
-		'class': 'cbi-button cbi-button-action',
-		'style': 'margin-top: 8px;',
+		'class': 'btn cbi-button cbi-button-action',
 		'click': function(ev) {
 			var btn = ev.target;
 			btn.disabled = true;
@@ -314,8 +316,13 @@ function renderStatusHeader() {
 
 	var section = E('fieldset', { 'class': 'cbi-section' }, [
 		E('legend', {}, _('Status')),
-		statusEl,
-		reloadBtn
+		E('div', { 'class': 'cbi-value' }, [
+			E('label', { 'class': 'cbi-value-title' }, _('Running Status')),
+			E('div', { 'class': 'cbi-value-field honk-status-field' }, [
+				statusEl,
+				reloadBtn
+			])
+		])
 	]);
 
 	function updateStatus(data) {
@@ -323,9 +330,9 @@ function renderStatusHeader() {
 		if (!tb) return;
 		if (data && data.running) {
 			var mem = data.memory ? ' (' + _('Memory Usage') + ': ' + data.memory + ')' : '';
-			tb.innerHTML = '<em style="color:green"><b>' + _('HONK') + ' ' + _('RUNNING') + '</b></em> <span style="color:#666; font-size:0.9em;">' + mem + '</span>';
+			tb.innerHTML = '<span style="color:var(--success, #22c55e); font-weight: bold;">' + _('HONK') + ' ' + _('RUNNING') + '</span> <span style="color:var(--text-muted, #888); font-size:0.9em;">' + mem + '</span>';
 		} else {
-			tb.innerHTML = '<em style="color:red"><b>' + _('HONK') + ' ' + _('NOT RUNNING') + '</b></em>';
+			tb.innerHTML = '<span style="color:var(--danger, #ef4444); font-weight: bold;">' + _('HONK') + ' ' + _('NOT RUNNING') + '</span>';
 		}
 	}
 

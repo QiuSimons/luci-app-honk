@@ -94,4 +94,10 @@ msgstr "清空日志失败："
 msgid "Configuration applied and service reloaded."
 msgstr "配置已生效并重载服务。"
 
+msgid "Status"
+msgstr "状态"
+
+msgid "Running Status"
+msgstr "运行状态"
+
 
