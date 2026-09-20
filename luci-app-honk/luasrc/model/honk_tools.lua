@@ -108,7 +108,8 @@ function M.get_clash_api_config()
     }
 
     local sys = require "luci.sys"
-    local pid = sys.exec("pidof honk-core 2>/dev/null | cut -d' ' -f1"):gsub("%s+", "")
+    local pids = sys.exec("pidof honk-core 2>/dev/null") or ""
+    local pid = pids:match("(%d+)") or ""
     res.running = (pid ~= "")
 
     local api_block = clean_content:match("clash_api%s*{(.-)}")
