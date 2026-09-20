@@ -1,4 +1,5 @@
 'use strict';
+'require baseclass';
 'require rpc';
 'require fs';
 'require ui';
@@ -337,7 +338,7 @@ function renderStatusHeader() {
 	return section;
 }
 
-return {
+return baseclass.extend({
 	callHonkStatus: callHonkStatus,
 	callHonkReload: callHonkReload,
 	callHonkGetLog: callHonkGetLog,
@@ -352,4 +353,4 @@ return {
 	formatEditor: formatEditor,
 	initCodeMirror: initCodeMirror,
 	renderStatusHeader: renderStatusHeader
-};
+});
