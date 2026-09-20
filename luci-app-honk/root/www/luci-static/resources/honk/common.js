@@ -97,17 +97,18 @@ function ensureEditorStyles() {
 
 	var style = document.createElement('style');
 	style.id = 'honk-editor-custom-style';
-	style.textContent = [
-		'.cm-format-btn { margin-top: 8px; margin-bottom: 8px; display: inline-block; }',
+		'.honk-editor-toolbar { margin-bottom: 6px; margin-top: 2px; display: flex; align-items: center; justify-content: flex-start; }',
+		'.cm-format-btn { margin: 0; cursor: pointer; }',
+		'.cbi-value:has(.CodeMirror) .cbi-value-field { flex: 1 1 0% !important; min-width: 0 !important; }',
 		'.CodeMirror {',
 		'	border: 1px solid var(--hairline, var(--border-color-medium, #ccc)) !important;',
 		'	border-radius: var(--radius-base, 4px);',
 		'	height: auto;',
-		'	min-height: 420px;',
+		'	min-height: 480px;',
 		'	font-family: var(--font-mono, monospace);',
 		'	font-size: 13px;',
-		'	background: var(--control-bg, var(--surface, var(--background-color-high, #ffffff))) !important;',
-		'	color: var(--text, var(--text-color-highest, inherit)) !important;',
+		'	background: var(--control-bg, var(--surface, #ffffff)) !important;',
+		'	color: var(--text, inherit) !important;',
 		'	box-shadow: none;',
 		'}',
 		'.CodeMirror-gutters {',
@@ -115,67 +116,14 @@ function ensureEditorStyles() {
 		'	background: var(--surface-sunken, var(--background-color-low, #f7f7f7)) !important;',
 		'}',
 		'.CodeMirror-linenumber { color: var(--text-muted, var(--text-color-low, #888888)) !important; }',
-		'.CodeMirror-cursor { border-left: 1px solid var(--text, var(--text-color-highest, currentColor)) !important; }',
-		'.CodeMirror-selected { background: var(--hover-faint, var(--background-color-medium, rgba(128, 128, 128, 0.2))) !important; }',
-		'.CodeMirror-focused .CodeMirror-selected { background: var(--brand-subtle, var(--background-color-medium, rgba(0, 133, 183, 0.25))) !important; }',
-		'.CodeMirror-activeline-background { background: var(--hover-faint, var(--background-color-low, rgba(128, 128, 128, 0.08))) !important; }',
-		'.CodeMirror-matchingbracket { text-decoration: underline; font-weight: bold; color: var(--brand, var(--primary-color-high, inherit)) !important; }',
-
-		'/* Dark mode container & gutter overrides across all themes */',
-		'[data-darkmode="true"] .CodeMirror, [data-theme="dark"] .CodeMirror, .dark .CodeMirror, html[data-darkmode=true] .CodeMirror {',
-		'	background: var(--control-bg, var(--surface, #141822)) !important;',
+		'[data-darkmode="true"] .CodeMirror, [data-theme="dark"] .CodeMirror, .dark .CodeMirror {',
+		'	background: var(--control-bg, #141822) !important;',
 		'	color: var(--text, #f9fafb) !important;',
 		'	border-color: var(--hairline, #334155) !important;',
 		'}',
-		'[data-darkmode="true"] .CodeMirror-gutters, [data-theme="dark"] .CodeMirror-gutters, .dark .CodeMirror-gutters, html[data-darkmode=true] .CodeMirror-gutters {',
+		'[data-darkmode="true"] .CodeMirror-gutters, [data-theme="dark"] .CodeMirror-gutters, .dark .CodeMirror-gutters {',
 		'	background: var(--surface-sunken, #0a0e17) !important;',
 		'	border-right-color: var(--hairline, #334155) !important;',
-		'}',
-		'[data-darkmode="true"] .CodeMirror-linenumber, [data-theme="dark"] .CodeMirror-linenumber, .dark .CodeMirror-linenumber, html[data-darkmode=true] .CodeMirror-linenumber {',
-		'	color: var(--text-muted, #909297) !important;',
-		'}',
-
-		'/* DAE syntax highlighting - Light Mode */',
-		'.cm-s-default .cm-keyword { color: #85007a; font-weight: bold; }',
-		'.cm-s-default .cm-variable-3 { color: #b45309; }',
-		'.cm-s-default .cm-variable-2 { color: #0369a1; }',
-		'.cm-s-default .cm-def { color: #0284c7; }',
-		'.cm-s-default .cm-operator.marker { color: #d946ef; font-weight: bold; }',
-		'.cm-s-default .cm-operator { color: #0284c7; }',
-		'.cm-s-default .cm-number { color: #0d9488; }',
-		'.cm-s-default .cm-string { color: #15803d; }',
-		'.cm-s-default .cm-comment { color: var(--text-muted, var(--text-color-low, #6b7280)); font-style: italic; }',
-
-		'/* DAE syntax highlighting - Dark Mode */',
-		'[data-darkmode="true"] .cm-s-default .cm-keyword, [data-theme="dark"] .cm-s-default .cm-keyword, .dark .cm-s-default .cm-keyword, html[data-darkmode=true] .cm-s-default .cm-keyword { color: #c678dd !important; font-weight: bold; }',
-		'[data-darkmode="true"] .cm-s-default .cm-variable-3, [data-theme="dark"] .cm-s-default .cm-variable-3, .dark .cm-s-default .cm-variable-3, html[data-darkmode=true] .cm-s-default .cm-variable-3 { color: #e5c07b !important; }',
-		'[data-darkmode="true"] .cm-s-default .cm-variable-2, [data-theme="dark"] .cm-s-default .cm-variable-2, .dark .cm-s-default .cm-variable-2, html[data-darkmode=true] .cm-s-default .cm-variable-2 { color: #61afef !important; }',
-		'[data-darkmode="true"] .cm-s-default .cm-def, [data-theme="dark"] .cm-s-default .cm-def, .dark .cm-s-default .cm-def, html[data-darkmode=true] .cm-s-default .cm-def { color: #56b6c2 !important; }',
-		'[data-darkmode="true"] .cm-s-default .cm-operator.marker, [data-theme="dark"] .cm-s-default .cm-operator.marker, .dark .cm-s-default .cm-operator.marker, html[data-darkmode=true] .cm-s-default .cm-operator.marker { color: #e06c75 !important; font-weight: bold; }',
-		'[data-darkmode="true"] .cm-s-default .cm-operator, [data-theme="dark"] .cm-s-default .cm-operator, .dark .cm-s-default .cm-operator, html[data-darkmode=true] .cm-s-default .cm-operator { color: #56b6c2 !important; }',
-		'[data-darkmode="true"] .cm-s-default .cm-number, [data-theme="dark"] .cm-s-default .cm-number, .dark .cm-s-default .cm-number, html[data-darkmode=true] .cm-s-default .cm-number { color: #d19a66 !important; }',
-		'[data-darkmode="true"] .cm-s-default .cm-string, [data-theme="dark"] .cm-s-default .cm-string, .dark .cm-s-default .cm-string, html[data-darkmode=true] .cm-s-default .cm-string { color: #98c379 !important; }',
-		'[data-darkmode="true"] .cm-s-default .cm-comment, [data-theme="dark"] .cm-s-default .cm-comment, .dark .cm-s-default .cm-comment, html[data-darkmode=true] .cm-s-default .cm-comment { color: var(--text-muted, #909297) !important; }',
-
-		'@media (prefers-color-scheme: dark) {',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .CodeMirror {',
-		'		background: var(--control-bg, var(--surface, #141822)) !important;',
-		'		color: var(--text, #f9fafb) !important;',
-		'		border-color: var(--hairline, #334155) !important;',
-		'	}',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .CodeMirror-gutters {',
-		'		background: var(--surface-sunken, #0a0e17) !important;',
-		'		border-right-color: var(--hairline, #334155) !important;',
-		'	}',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-keyword { color: #c678dd; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-variable-3 { color: #e5c07b; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-variable-2 { color: #61afef; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-def { color: #56b6c2; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-operator.marker { color: #e06c75; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-operator { color: #56b6c2; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-number { color: #d19a66; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-string { color: #98c379; }',
-		'	:root:not([data-darkmode="false"]):not([data-theme="light"]) .cm-s-default .cm-comment { color: var(--text-muted, #909297); }',
 		'}'
 	].join('\n');
 	document.head.appendChild(style);
@@ -311,15 +259,17 @@ function initCodeMirror(textarea, onSaveCallback) {
 
 		var formatBtn = E('button', {
 			'type': 'button',
-			'class': 'cbi-button cm-format-btn',
+			'class': 'btn cbi-button cm-format-btn',
 			'click': function() {
 				formatEditor(editor);
 				syncTextarea();
 			}
 		}, _('Format Code'));
 
+		var toolbar = E('div', { 'class': 'honk-editor-toolbar' }, [ formatBtn ]);
+
 		var wrapper = editor.getWrapperElement();
-		wrapper.parentNode.insertBefore(formatBtn, wrapper);
+		wrapper.parentNode.insertBefore(toolbar, wrapper);
 
 		var form = textarea.closest('form');
 		if (form && !form.dataset.cmHooked) {

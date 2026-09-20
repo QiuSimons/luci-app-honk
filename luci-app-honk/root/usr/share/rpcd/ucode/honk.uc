@@ -14,8 +14,8 @@ function strip_dae_comments(content) {
 		let clean = "";
 		let len = length(line);
 		for (let i = 0; i < len; i++) {
-			let c = line[i];
-			let next_c = (i + 1 < len) ? line[i + 1] : "";
+			let c = substr(line, i, 1);
+			let next_c = (i + 1 < len) ? substr(line, i + 1, 1) : "";
 			if (c == "'" && !in_double) {
 				in_single = !in_single;
 				clean += c;
@@ -44,10 +44,10 @@ function parse_clash_api(clean_content) {
 	if (!api_m) return null;
 	let block = api_m[1];
 
-	let ec_m = match(block, /external_controller\s*:\s*['"]?([^'"\s\r\n]+)['"]?/);
-	let ui_m = match(block, /external_ui\s*:\s*['"]?([^'"\s\r\n]+)['"]?/);
-	let sec_m = match(block, /secret\s*:\s*['"]?([^'"\s\r\n]*)['"]?/);
-	let dm_m = match(block, /default_mode\s*:\s*['"]?([^'"\s\r\n]*)['"]?/);
+	let ec_m = match(block, /external_controller\s*:\s*['"]?([^'" \t\r\n]+)['"]?/);
+	let ui_m = match(block, /external_ui\s*:\s*['"]?([^'" \t\r\n]+)['"]?/);
+	let sec_m = match(block, /secret\s*:\s*['"]?([^'" \t\r\n]*)['"]?/);
+	let dm_m = match(block, /default_mode\s*:\s*['"]?([^'" \t\r\n]*)['"]?/);
 
 	let res = {
 		external_controller: ec_m ? ec_m[1] : "",
@@ -84,8 +84,12 @@ function parse_clash_api(clean_content) {
 function get_config_file_path() {
 	let uci_str = readfile("/etc/config/honk");
 	if (uci_str) {
-		let m = match(uci_str, /option\s+config_file\s+['"]?([^'"\s\r\n]+)['"]?/);
-		if (m && m[1]) return m[1];
+		let m_single = match(uci_str, /option\s+config_file\s+'([^']+)'/);
+		if (m_single && m_single[1]) return m_single[1];
+		let m_double = match(uci_str, /option\s+config_file\s+"([^"]+)"/);
+		if (m_double && m_double[1]) return m_double[1];
+		let m_unquoted = match(uci_str, /option\s+config_file\s+([^ \t\r\n]+)/);
+		if (m_unquoted && m_unquoted[1]) return m_unquoted[1];
 	}
 	return "/etc/honk/config.dae";
 }
@@ -194,7 +198,7 @@ return {
 					url = "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip";
 				}
 
-				if (!match(url, /^https?:\/\/[0-9a-zA-Z._~:\/?#\[\]@!$&'()*+,;=%-]+$/)) {
+				if (!match(url, /^https?:\/\//) || match(url, /[ \t\r\n'"`]/)) {
 					return { success: false, message: "Invalid URL" };
 				}
 
