@@ -262,5 +262,24 @@ msgstr "已设置 (隐藏)"
 msgid "Not configured (Empty)"
 msgstr "未设置（留空）"
 
+msgid "Reloading..."
+msgstr "正在重载..."
+
+msgid "HONK service reload triggered successfully."
+msgstr "已成功触发 HONK 服务重载。"
+
+msgid "Failed to reload HONK: "
+msgstr "重载 HONK 失败："
+
+msgid "DNS configuration saved and service reloaded."
+msgstr "DNS 配置已保存并重载服务。"
+
+msgid "Node configuration saved and service reloaded."
+msgstr "节点配置已保存并重载服务。"
+
+msgid "Routing configuration saved and service reloaded."
+msgstr "路由配置已保存并重载服务。"
+
+
 
 
