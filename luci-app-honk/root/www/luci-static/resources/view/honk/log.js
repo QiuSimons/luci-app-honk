@@ -15,7 +15,7 @@ return view.extend({
 		var logTextarea = E('textarea', {
 			'id': 'log_textarea',
 			'class': 'cbi-input-textarea',
-			'style': 'width: calc(100% - 20px); height: 645px; margin: 10px; font-family: var(--font-mono, monospace); font-size: 12px; line-height: 1.4;',
+			'style': 'width: 100%; height: 600px; font-family: var(--font-mono, monospace); font-size: 12px; line-height: 1.4; box-sizing: border-box; resize: vertical;',
 			'rows': 25,
 			'wrap': 'off',
 			'readonly': 'readonly'
@@ -23,8 +23,7 @@ return view.extend({
 
 		var btnClear = E('button', {
 			'type': 'button',
-			'class': 'cbi-button cbi-button-remove',
-			'style': 'margin-left: 10px; margin-top: 10px;',
+			'class': 'btn cbi-button cbi-button-remove',
 			'click': function() {
 				btnClear.disabled = true;
 				honk.callHonkClearLog().then(function() {
@@ -36,7 +35,7 @@ return view.extend({
 					ui.addNotification(null, E('p', _('Logs cleared successfully.')), 'info');
 				}).catch(function(err) {
 					btnClear.disabled = false;
-					ui.addNotification(null, E('p', _('Failed to clear logs: ') + err.message), 'error');
+					ui.addNotification(null, E('p', _('Failed to clear logs: ') + (err.message || err)), 'error');
 				});
 			}
 		}, _('Clear logs'));
@@ -60,8 +59,9 @@ return view.extend({
 
 		return E('fieldset', { 'class': 'cbi-section', 'id': '_log_fieldset' }, [
 			E('legend', {}, _('Logs')),
-			btnClear,
+			E('div', { 'style': 'margin-bottom: 10px;' }, [ btnClear ]),
 			logTextarea
 		]);
 	}
 });
+

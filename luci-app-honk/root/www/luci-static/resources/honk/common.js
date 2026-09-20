@@ -121,14 +121,15 @@ function ensureEditorStyles() {
 		'	background: var(--surface-sunken, var(--background-color-low, #f7f7f7)) !important;',
 		'}',
 		'.CodeMirror-linenumber { color: var(--text-muted, var(--text-color-low, #888888)) !important; }',
+		'.CodeMirror-cursor { border-left: 1px solid var(--text, currentColor) !important; }',
 		'[data-darkmode="true"] .CodeMirror, [data-theme="dark"] .CodeMirror, .dark .CodeMirror {',
-		'	background: var(--control-bg, #141822) !important;',
+		'	background: var(--control-bg, var(--surface, #141822)) !important;',
 		'	color: var(--text, #f9fafb) !important;',
-		'	border-color: var(--hairline, #334155) !important;',
+		'	border-color: var(--hairline, var(--border-color-medium, #334155)) !important;',
 		'}',
 		'[data-darkmode="true"] .CodeMirror-gutters, [data-theme="dark"] .CodeMirror-gutters, .dark .CodeMirror-gutters {',
-		'	background: var(--surface-sunken, #0a0e17) !important;',
-		'	border-right-color: var(--hairline, #334155) !important;',
+		'	background: var(--surface-sunken, var(--background-color-low, #0a0e17)) !important;',
+		'	border-right-color: var(--hairline, var(--border-color-medium, #334155)) !important;',
 		'}'
 	].join('\n');
 	document.head.appendChild(style);

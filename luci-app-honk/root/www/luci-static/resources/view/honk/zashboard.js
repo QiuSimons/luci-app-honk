@@ -42,37 +42,13 @@ return view.extend({
 			'	height: calc(100vh - 210px);',
 			'	min-height: 650px;',
 			'	border: 1px solid var(--hairline, var(--border-color-medium, #ccc));',
-			'	border-radius: 4px;',
+			'	border-radius: var(--radius-base, 4px);',
 			'	display: block;',
 			'}',
 			'#zash_iframe.fullscreen {',
 			'	position: fixed !important; top: 0 !important; left: 0 !important;',
 			'	width: 100vw !important; height: 100vh !important; z-index: 999999 !important;',
 			'	border: none !important; border-radius: 0 !important;',
-			'}',
-			'#update_modal {',
-			'	position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;',
-			'	background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);',
-			'	display: flex; align-items: center; justify-content: center; z-index: 9999;',
-			'}',
-			'.zash-modal-box {',
-			'	background: var(--surface-overlay, var(--surface, var(--background-color-high, #ffffff))) !important;',
-			'	color: var(--text, var(--text-color-highest, inherit)) !important;',
-			'	border: 1px solid var(--hairline, var(--border-color-low, #ccc)) !important;',
-			'	border-radius: var(--radius-base, 8px) !important;',
-			'	padding: 22px 24px !important;',
-			'	box-shadow: var(--app-shadow-lg, 0 16px 36px rgba(0, 0, 0, 0.35)) !important;',
-			'	width: 500px; max-width: 92vw; margin: 0 !important; box-sizing: border-box;',
-			'}',
-			'.zash-modal-close {',
-			'	background: transparent; border: none; cursor: pointer; width: 28px; height: 28px;',
-			'	border-radius: var(--radius-base, 4px); display: inline-flex; align-items: center; justify-content: center;',
-			'	color: var(--text-muted, var(--text-color-medium, #888)); padding: 0;',
-			'	transition: background-color 0.15s, color 0.15s;',
-			'}',
-			'.zash-modal-close:hover {',
-			'	background: var(--hover-faint, rgba(128, 128, 128, 0.15));',
-			'	color: var(--text, var(--text-color-highest, #333));',
 			'}',
 			'.zash-log-box {',
 			'	max-height: 150px; overflow-y: auto; font-family: var(--font-mono, monospace);',
@@ -262,94 +238,58 @@ return view.extend({
 		var modalLogBox = E('div', { 'class': 'zash-log-box' });
 		var modalProgressWrap = E('div', { 'style': 'display: none; margin-top: 12px;' }, [ modalLogBox ]);
 
-		var btnConfirmUpdate = E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-action' }, _('开始更新'));
-		var btnCancelUpdate = E('button', { 'type': 'button', 'class': 'cbi-button' }, _('取消'));
-		var btnCloseModal = E('button', {
-			'type': 'button',
-			'class': 'zash-modal-close',
-			'title': _('关闭')
-		}, [
-			document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-		]);
-
-		// Create close SVG
-		var closeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-		closeSvg.setAttribute('width', '14');
-		closeSvg.setAttribute('height', '14');
-		closeSvg.setAttribute('viewBox', '0 0 24 24');
-		closeSvg.setAttribute('fill', 'none');
-		closeSvg.setAttribute('stroke', 'currentColor');
-		closeSvg.setAttribute('stroke-width', '2');
-		closeSvg.setAttribute('stroke-linecap', 'round');
-		closeSvg.setAttribute('stroke-linejoin', 'round');
-		var l1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-		l1.setAttribute('x1', '18'); l1.setAttribute('y1', '6'); l1.setAttribute('x2', '6'); l1.setAttribute('y2', '18');
-		var l2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-		l2.setAttribute('x1', '6'); l2.setAttribute('y1', '6'); l2.setAttribute('x2', '18'); l2.setAttribute('y2', '18');
-		closeSvg.appendChild(l1);
-		closeSvg.appendChild(l2);
-		btnCloseModal.innerHTML = '';
-		btnCloseModal.appendChild(closeSvg);
-
-		var updateModal = E('div', { 'id': 'update_modal', 'style': 'display: none;' }, [
-			E('div', { 'class': 'zash-modal-box' }, [
-				E('div', { 'style': 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;' }, [
-					E('h4', { 'style': 'margin: 0; font-size: 16px; font-weight: 600;' }, _('更新 Zashboard 面板')),
-					btnCloseModal
-				]),
-				E('p', { 'class': 'cbi-section-descr', 'style': 'margin: 0 0 14px 0; color: var(--text-muted, inherit); line-height: 1.5; font-size: 13px;' }, [
-					_('系统将下载最新的无字体极简版（dist-no-fonts.zip）并重新部署至目标目录：'),
-					updateTargetLabel
-				]),
-				E('div', { 'style': 'margin: 14px 0;' }, [
-					E('label', { 'style': 'font-weight: 600; display: block; margin-bottom: 8px; font-size: 13px;' }, _('选择下载源：')),
-					E('div', { 'style': 'display: flex; flex-direction: column; gap: 8px;' }, [
-						E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;' }, [
-							modalRadioGithub, E('span', {}, [ E('strong', {}, 'GitHub 官方 Release '), '(dist-no-fonts.zip)' ])
-						]),
-						E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;' }, [
-							modalRadioMirror, E('span', {}, [ E('strong', {}, '国内高速镜像 '), '(ghfast.top 加速)' ])
-						])
-					])
-				]),
-				modalProgressWrap,
-				E('div', { 'style': 'margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;' }, [
-					btnCancelUpdate,
-					btnConfirmUpdate
-				])
-			])
-		]);
-
-		function closeModal() {
-			updateModal.style.display = 'none';
-		}
-		btnCloseModal.onclick = closeModal;
-		btnCancelUpdate.onclick = closeModal;
+		var btnConfirmUpdate = E('button', { 'type': 'button', 'class': 'btn cbi-button cbi-button-action' }, _('开始更新'));
 
 		btnConfirmUpdate.onclick = function() {
 			var url = modalRadioMirror.checked ? modalRadioMirror.value : modalRadioGithub.value;
 			btnConfirmUpdate.disabled = true;
 			triggerDownload(url, modalLogBox, modalProgressWrap, function() {
-				closeModal();
+				ui.hideModal();
 				btnConfirmUpdate.disabled = false;
 			});
 		};
 
 		var btnUpdateDashboard = E('button', {
 			'type': 'button',
-			'class': 'cbi-button',
+			'class': 'btn cbi-button',
 			'title': _('更新至最新版 Zashboard'),
 			'click': function() {
 				modalProgressWrap.style.display = 'none';
 				modalLogBox.innerText = '';
 				btnConfirmUpdate.disabled = false;
-				updateModal.style.display = 'flex';
+
+				ui.showModal(_('更新 Zashboard 面板'), [
+					E('p', { 'class': 'cbi-section-descr' }, [
+						_('系统将下载最新的无字体极简版（dist-no-fonts.zip）并重新部署至目标目录：'),
+						updateTargetLabel
+					]),
+					E('div', { 'class': 'cbi-value' }, [
+						E('label', { 'class': 'cbi-value-title' }, _('选择下载源')),
+						E('div', { 'class': 'cbi-value-field', 'style': 'display: flex; flex-direction: column; gap: 8px;' }, [
+							E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer;' }, [
+								modalRadioGithub, E('span', {}, [ E('strong', {}, 'GitHub 官方 Release '), '(dist-no-fonts.zip)' ])
+							]),
+							E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer;' }, [
+								modalRadioMirror, E('span', {}, [ E('strong', {}, '国内高速镜像 '), '(ghfast.top 加速)' ])
+							])
+						])
+					]),
+					modalProgressWrap,
+					E('div', { 'class': 'right', 'style': 'margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;' }, [
+						E('button', {
+							'type': 'button',
+							'class': 'btn cbi-button',
+							'click': ui.hideModal
+						}, _('取消')),
+						btnConfirmUpdate
+					])
+				]);
 			}
 		}, _('更新面板'));
 
 		var btnRefreshIframe = E('button', {
 			'type': 'button',
-			'class': 'cbi-button',
+			'class': 'btn cbi-button',
 			'title': _('刷新面板内容'),
 			'click': function() {
 				if (currentInfo) {
@@ -360,7 +300,7 @@ return view.extend({
 
 		var btnToggleFullscreen = E('button', {
 			'type': 'button',
-			'class': 'cbi-button',
+			'class': 'btn cbi-button',
 			'title': _('切换全屏显示'),
 			'click': function() {
 				if (!document.fullscreenElement) {
@@ -505,8 +445,7 @@ return view.extend({
 			stateLoading,
 			stateUnconfigured,
 			stateMissingUi,
-			stateReady,
-			updateModal
+			stateReady
 		]);
 	}
 });
