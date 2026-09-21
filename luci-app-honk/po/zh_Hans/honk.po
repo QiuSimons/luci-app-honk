@@ -16,9 +16,6 @@ msgstr "启用"
 msgid "Reload Service"
 msgstr "重载服务"
 
-msgid "Reload service to apply configuration."
-msgstr "重载服务以使配置生效。"
-
 msgid "Global Settings"
 msgstr "全局设置"
 
@@ -64,20 +61,8 @@ msgstr "日志"
 msgid "Memory Usage"
 msgstr "内存占用"
 
-msgid "Enable Auto Subscribe Update"
-msgstr "启用订阅自动更新"
-
-msgid "Update Cycle"
-msgstr "更新周期"
-
-msgid "Update Time (Every Day)"
-msgstr "更新时间（每天）"
-
 msgid "Format Code"
 msgstr "格式化代码"
-
-msgid "Dashboard"
-msgstr "控制面板"
 
 msgid "Clear logs"
 msgstr "清空日志"
@@ -277,6 +262,14 @@ msgstr "节点配置已保存并重载服务。"
 msgid "Routing configuration saved and service reloaded."
 msgstr "路由配置已保存并重载服务。"
 
+msgid "Zashboard"
+msgstr "Zashboard"
 
+msgid "Mirror"
+msgstr "镜像源"
 
+msgid "Mirror 1"
+msgstr "镜像源 1"
 
+msgid "Mirror 2"
+msgstr "镜像源 2"

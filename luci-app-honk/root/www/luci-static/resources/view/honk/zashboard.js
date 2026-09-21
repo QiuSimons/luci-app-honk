@@ -191,10 +191,10 @@ return view.extend({
 						radioGithub, E('span', {}, [ E('strong', {}, 'GitHub Release '), '(dist-no-fonts.zip)' ])
 					]),
 					E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer;' }, [
-						radioMirror1, E('span', {}, [ E('strong', {}, 'Mirror 1 '), '(ghfast.top)' ])
+						radioMirror1, E('span', {}, [ E('strong', {}, _('Mirror 1') + ' '), '(ghfast.top)' ])
 					]),
 					E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer;' }, [
-						radioMirror2, E('span', {}, [ E('strong', {}, 'Mirror 2 '), '(ghproxy.net)' ])
+						radioMirror2, E('span', {}, [ E('strong', {}, _('Mirror 2') + ' '), '(ghproxy.net)' ])
 					]),
 					E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer;' }, [
 						radioCustom, E('span', {}, E('strong', {}, _('Custom URL')))
@@ -272,7 +272,7 @@ return view.extend({
 								modalRadioGithub, E('span', {}, [ E('strong', {}, 'GitHub Release '), '(dist-no-fonts.zip)' ])
 							]),
 							E('label', { 'style': 'display: flex; align-items: center; gap: 8px; cursor: pointer;' }, [
-								modalRadioMirror, E('span', {}, [ E('strong', {}, 'Mirror '), '(ghfast.top)' ])
+								modalRadioMirror, E('span', {}, [ E('strong', {}, _('Mirror') + ' '), '(ghfast.top)' ])
 							])
 						])
 					]),
