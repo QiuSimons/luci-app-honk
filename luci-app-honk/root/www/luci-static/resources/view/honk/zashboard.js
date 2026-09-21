@@ -80,12 +80,12 @@ return view.extend({
 						quickEnableMsg.innerText = _('Successfully enabled! Restarting service and initializing dashboard...');
 						setTimeout(loadInfo, 2500);
 					} else {
-						ui.addNotification(null, E('p', _('Failed to enable: ') + (resp ? resp.message : _('Unknown error'))), 'error');
+						ui.addNotification(null, E('p', _('Failed to enable:') + ' ' + (resp ? resp.message : _('Unknown error'))), 'error');
 					}
 				}).catch(function(err) {
 					btnQuickEnable.disabled = false;
 					btnQuickEnable.innerText = _('One-click Enable Default Clash API');
-					ui.addNotification(null, E('p', _('Failed to enable: ') + (err.message || err)), 'error');
+					ui.addNotification(null, E('p', _('Failed to enable:') + ' ' + (err.message || err)), 'error');
 				});
 			}
 		}, _('One-click Enable Default Clash API'));
@@ -209,16 +209,16 @@ return view.extend({
 		// State 3: Ready
 		var httpsAlert = E('div', { 'class': 'alert-message warning', 'style': 'display: none; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;' }, [
 			E('div', {}, [
-				E('strong', {}, _('HTTPS access detected: ')),
+				E('strong', {}, _('HTTPS access detected:') + ' '),
 				E('span', {}, _('Modern browsers may block HTTP iframe resources under HTTPS. If the dashboard fails to display, open it in a new tab.'))
 			]),
-			E('a', { 'href': '#', 'target': '_blank', 'class': 'cbi-button cbi-button-action', 'style': 'white-space: nowrap; margin-left: 10px;' }, '↗ ' + _('Open in New Tab'))
+			E('a', { 'href': '#', 'target': '_blank', 'class': 'cbi-button cbi-button-action', 'style': 'white-space: nowrap; margin-left: 10px;' }, _('Open in New Tab'))
 		]);
 
 		var honkPortLabel = E('span', { 'class': 'honk_port_label' }, '9090');
 		var honkStopAlert = E('div', { 'class': 'alert-message warning', 'style': 'display: none; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;' }, [
 			E('div', {}, [
-				E('strong', {}, _('HONK service is currently not running: ')),
+				E('strong', {}, _('HONK service is currently not running:') + ' '),
 				E('span', {}, [ _('Clash API port ('), honkPortLabel, _(') is not listening. Start the service to display data.') ])
 			]),
 			E('a', { 'href': L.url('admin/services/honk/global'), 'class': 'cbi-button cbi-button-action', 'style': 'white-space: nowrap; margin-left: 10px;' }, _('Start HONK'))
@@ -226,7 +226,7 @@ return view.extend({
 
 		var statusServicePill = E('span', { 'class': 'label success' }, _('Running'));
 		var statusEndpointPill = E('span', { 'class': 'label notice', 'style': 'font-family: monospace;' });
-		var btnExternalOpen = E('a', { 'href': '#', 'target': '_blank', 'class': 'cbi-button cbi-button-action', 'title': _('Open independently in a new tab') }, '↗ ' + _('New Tab'));
+		var btnExternalOpen = E('a', { 'href': '#', 'target': '_blank', 'class': 'cbi-button cbi-button-action', 'title': _('Open independently in a new tab') }, _('New Tab'));
 		var iframe = E('iframe', { 'id': 'zash_iframe', 'src': 'about:blank', 'allow': 'fullscreen; clipboard-read; clipboard-write' });
 
 		// Update Modal
@@ -261,7 +261,8 @@ return view.extend({
 
 				ui.showModal(_('Update Zashboard Dashboard'), [
 					E('p', { 'class': 'cbi-section-descr' }, [
-						_('The latest fontless version (dist-no-fonts.zip) will be downloaded and deployed to: '),
+						_('The latest fontless version (dist-no-fonts.zip) will be downloaded and deployed to:'),
+						' ',
 						updateTargetLabel
 					]),
 					E('div', { 'class': 'cbi-value' }, [
@@ -350,7 +351,7 @@ return view.extend({
 
 			honk.callHonkDownloadZashboard(url).then(function(resp) {
 				if (!resp || !resp.success) {
-					logBox.innerText += _('Failed to trigger download: ') + (resp ? resp.message : _('Unknown error')) + '\n';
+					logBox.innerText += _('Failed to trigger download:') + ' ' + (resp ? resp.message : _('Unknown error')) + '\n';
 					if (onFinish) onFinish();
 					return;
 				}
@@ -384,7 +385,7 @@ return view.extend({
 
 				poll.add(downloadPollFn, 1);
 			}).catch(function(err) {
-				logBox.innerText += _('Download error: ') + (err.message || err) + '\n';
+				logBox.innerText += _('Download error:') + ' ' + (err.message || err) + '\n';
 				if (onFinish) onFinish();
 			});
 		}
