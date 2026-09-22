@@ -234,6 +234,15 @@ return view.extend({
 		var statusEndpointPill = E('span', { 'class': 'label notice', 'style': 'font-family: monospace;' });
 		var btnExternalOpen = E('a', { 'href': '#', 'target': '_blank', 'class': 'cbi-button cbi-button-action', 'title': _('Open independently in a new tab') }, _('New Tab'));
 		var iframe = E('iframe', { 'id': 'zash_iframe', 'src': 'about:blank', 'allow': 'fullscreen; clipboard-read; clipboard-write' });
+		var scrollHandle = E('div', { 'id': 'zash_scroll_handle', 'title': _('Drag to scroll page') }, ['\u22ee']);
+		var scrollLastY;
+		scrollHandle.addEventListener('touchstart', function(e) { scrollLastY = e.touches[0].clientY; }, { passive: true });
+		scrollHandle.addEventListener('touchmove', function(e) {
+			window.scrollBy(0, scrollLastY - e.touches[0].clientY);
+			scrollLastY = e.touches[0].clientY;
+			e.preventDefault();
+		}, { passive: false });
+		var iframeWrap = E('div', { 'id': 'zash_iframe_wrap' }, [iframe, scrollHandle]);
 
 		// Update Modal
 		var updateTargetLabel = E('code', {
@@ -341,21 +350,7 @@ return view.extend({
 					btnExternalOpen
 				])
 			]),
-			(function() {
-				var handle = E('div', { 'id': 'zash_scroll_handle', 'title': _('Drag to scroll page') }, [ '⋮' ]);
-				var startY, startScrollY;
-				handle.addEventListener('touchstart', function(e) {
-					startY = e.touches[0].clientY;
-					startScrollY = window.pageYOffset || document.documentElement.scrollTop;
-					e.preventDefault();
-				}, { passive: false });
-				handle.addEventListener('touchmove', function(e) {
-					var dy = startY - e.touches[0].clientY;
-					window.scrollTo(0, startScrollY + dy);
-					e.preventDefault();
-				}, { passive: false });
-				return E('div', { 'id': 'zash_iframe_wrap' }, [ iframe, handle ]);
-			})()
+			iframeWrap
 		]);
 
 		function showState(name) {
