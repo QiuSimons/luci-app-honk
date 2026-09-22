@@ -51,6 +51,12 @@ return view.extend({
 			'	width: 100vw !important; height: 100vh !important; z-index: 999999 !important;',
 			'	border: none !important; border-radius: 0 !important;',
 			'}',
+			'#zash_iframe_wrap { display: flex; align-items: stretch; }',
+			'#zash_scroll_handle { display: none; }',
+			'@media (max-width: 768px) {',
+			'	#zash_iframe { border-right: none; border-radius: var(--radius-base,4px) 0 0 var(--radius-base,4px); }',
+			'	#zash_scroll_handle { display: flex; align-items: center; justify-content: center; width: 14px; flex-shrink: 0; touch-action: none; user-select: none; border: 1px solid var(--hairline,var(--border-color-medium,#ccc)); border-radius: 0 var(--radius-base,4px) var(--radius-base,4px) 0; }',
+			'}',
 			'.zash-log-box {',
 			'	max-height: 150px; overflow-y: auto; font-family: var(--font-mono, monospace);',
 			'	font-size: 12px; line-height: 1.4; padding: 8px; margin: 8px 0;',
@@ -335,7 +341,21 @@ return view.extend({
 					btnExternalOpen
 				])
 			]),
-			iframe
+			(function() {
+				var handle = E('div', { 'id': 'zash_scroll_handle', 'title': _('Drag to scroll page') }, [ '⋮' ]);
+				var startY, startScrollY;
+				handle.addEventListener('touchstart', function(e) {
+					startY = e.touches[0].clientY;
+					startScrollY = window.pageYOffset || document.documentElement.scrollTop;
+					e.preventDefault();
+				}, { passive: false });
+				handle.addEventListener('touchmove', function(e) {
+					var dy = startY - e.touches[0].clientY;
+					window.scrollTo(0, startScrollY + dy);
+					e.preventDefault();
+				}, { passive: false });
+				return E('div', { 'id': 'zash_iframe_wrap' }, [ iframe, handle ]);
+			})()
 		]);
 
 		function showState(name) {
