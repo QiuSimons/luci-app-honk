@@ -265,16 +265,6 @@ return {
 					return { success: false, message: "Config file not found: " + config_file };
 				}
 
-				let default_block =
-"experimental {\n" +
-"    clash_api {\n" +
-"        external_controller: '0.0.0.0:9090'\n" +
-"        external_ui: '/etc/honk/zashboard'\n" +
-"        secret: ''\n" +
-"        default_mode: 'Rule'\n" +
-"    }\n" +
-"}\n";
-
 				let api_inner =
 "    clash_api {\n" +
 "        external_controller: '0.0.0.0:9090'\n" +
@@ -282,6 +272,8 @@ return {
 "        secret: ''\n" +
 "        default_mode: 'Rule'\n" +
 "    }\n";
+
+				let default_block = "experimental {\n" + api_inner + "}\n";
 
 				let cleaned = remove_bracket_block(content, /^[#\/]*\s*clash_api\s*\{/);
 				cleaned = replace(cleaned, /experimental\s*\{\s*\}/, "experimental {\n}");

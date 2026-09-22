@@ -322,9 +322,7 @@ function initCodeMirror(textarea, onSaveCallback) {
 				try {
 					formatEditor(editor);
 					syncTextarea();
-					var isZh = (window.L && window.L.env && window.L.env.lang && window.L.env.lang.indexOf('zh') !== -1);
-					var formattedText = '✓ ' + (isZh ? '已格式化' : _('Formatted'));
-					formatBtn.textContent = formattedText;
+					formatBtn.textContent = '✓ ' + _('Formatted');
 					formatBtn.classList.add('cbi-button-positive');
 					clearTimeout(formatBtn._resetTimer);
 					formatBtn._resetTimer = setTimeout(function() {
