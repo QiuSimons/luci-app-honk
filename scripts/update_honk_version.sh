@@ -85,23 +85,13 @@ derive_version() {
 
 assert_apk_version() {
     local v="$1"
-    
-    # 策略 1: 本地 apk 工具校验
+
     if command -v apk >/dev/null 2>&1; then
         apk version -c "$v" >/dev/null 2>&1 && return 0 || return 1
     fi
 
-    # 策略 2: 正则静态分析 (模拟 apk-tools 内部验证器)
     local apk_regex="^[0-9]+(\.[0-9]+)*[a-z]?(_(alpha|beta|pre|rc|cvs|svn|git|hg|p)[0-9]*)*$"
-    if ! printf '%s' "$v" | grep -qE "$apk_regex"; then
-        # 策略 3: 若正则存疑且有 Docker 环境，交由官方 Alpine 容器最终裁决
-        if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-            docker run --rm alpine apk version -c "$v" >/dev/null 2>&1 && return 0 || return 1
-        fi
-        return 1
-    fi
-    
-    return 0
+    printf '%s' "$v" | grep -qE "$apk_regex"
 }
 
 resolve_tag() {
@@ -181,7 +171,7 @@ main() {
     hash_x86_64="$(resolve_hash HONK_HASH_X86_64 "x86_64-unknown-linux-musl" "$suffix" "$tag")"
     hash_aarch64="$(resolve_hash HONK_HASH_AARCH64 "aarch64-unknown-linux-musl" "$suffix" "$tag")"
 
-    # [绝对鲁棒点] 放弃 sed -i，单次流式替换，完美兼容 macOS/BSD/Linux
+    # Stream substitution compatible across Linux and macOS/BSD
     sed -E \
         -e "s/^PKG_VERSION:=.*/PKG_VERSION:=${version}/" \
         -e "s/^HONK_RELEASE_TAG:=.*/HONK_RELEASE_TAG:=${tag}/" \
