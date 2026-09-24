@@ -23,6 +23,9 @@ jobs:
       - name: Update honk version
         run: bash scripts/update_honk_version.sh
 
+      - name: Update doona dashboard
+        run: bash scripts/update_doona.sh
+
       - name: Commit changes
         id: commit
         shell: bash
@@ -30,14 +33,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet; then
+          git add honk/Makefile luci-app-honk/root/etc/honk/dashboard
+
+          if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No version change."
           else
-            TAG="$(grep '^HONK_RELEASE_TAG:=' honk/Makefile | cut -d= -f2)"
-
-            git add honk/Makefile
-            git commit -m "honk: update to ${TAG}"
+            TAG="$(grep '^HONK_RELEASE_TAG:=' honk/Makefile | cut -d= -f2 || true)"
+            git commit -m "auto: update honk ${TAG} and doona dashboard"
 
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
