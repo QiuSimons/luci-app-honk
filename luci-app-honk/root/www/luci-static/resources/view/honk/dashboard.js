@@ -6,6 +6,18 @@
 'require rpc';
 'require honk.common as honk';
 
+var notify = function(title, children, type, timeout) {
+	if (honk && honk.showNotification) {
+		return honk.showNotification(title, children, type, timeout);
+	}
+	if (ui && ui.addTimeLimitedNotification) {
+		return ui.addTimeLimitedNotification(title, children, timeout || 3000, type);
+	}
+	if (ui && ui.addNotification) {
+		return ui.addNotification(title, children, type);
+	}
+};
+
 var callHonkStatus = (honk && honk.callHonkStatus) || rpc.declare({
 	object: 'luci.honk',
 	method: 'status',
@@ -225,12 +237,12 @@ var btnQuickEnable = E('button', {
 				quickEnableMsg.innerText = _('Successfully enabled! Restarting service and initializing dashboard...');
 				setTimeout(loadInfo, 2500);
 			} else {
-				ui.addNotification(null, E('p', _('Failed to enable:') + ' ' + (resp ? resp.message : _('Unknown error'))), 'error');
+				notify(null, E('p', _('Failed to enable:') + ' ' + (resp ? resp.message : _('Unknown error'))), 'error');
 			}
 		}).catch(function(err) {
 			btnQuickEnable.disabled = false;
 			btnQuickEnable.innerText = enableBtnText;
-			ui.addNotification(null, E('p', _('Failed to enable:') + ' ' + (err.message || err)), 'error');
+			notify(null, E('p', _('Failed to enable:') + ' ' + (err.message || err)), 'error');
 		});
 	}
 }, enableBtnText);
@@ -294,8 +306,8 @@ var url = '';
 if (radioCustom.checked) {
 url = (inputCustomUrl.value || '').trim();
 if (!url) {
-ui.addNotification(null, E('p', _('Please enter a valid download URL')), 'error');
-return;
+	notify(null, E('p', _('Please enter a valid download URL')), 'error');
+	return;
 }
 } else if (radioMirror1.checked) {
 url = radioMirror1.value;
@@ -372,22 +384,14 @@ var honkStopAlert = E('div', { 'class': 'alert-message warning', 'style': 'displ
 
 var statusServicePill = E('span', { 'class': 'label success' }, _('Running'));
 var statusEndpointPill = E('span', { 'class': 'label notice', 'style': 'font-family: monospace;' });
+var tokenText = E('span', {
+	'style': 'user-select: all; -webkit-user-select: all; font-weight: bold;',
+	'title': _('Click or drag to select Token')
+});
 var tokenPill = E('span', {
 	'class': 'label info',
-	'style': 'cursor: pointer; user-select: all; font-family: monospace; display: none;',
-	'title': _('Click to copy API Token')
-});
-tokenPill.addEventListener('click', function() {
-	if (currentInfo && currentInfo.secret) {
-		if (navigator.clipboard && navigator.clipboard.writeText) {
-			navigator.clipboard.writeText(currentInfo.secret).then(function() {
-				ui.addNotification(null, E('p', _('Token copied to clipboard: ') + currentInfo.secret), 'info');
-			});
-		} else {
-			ui.addNotification(null, E('p', _('Token: ') + currentInfo.secret), 'info');
-		}
-	}
-});
+	'style': 'font-family: monospace; display: none; padding: 2px 6px;'
+}, [ 'Token: ', tokenText ]);
 var btnExternalOpen = E('a', { 'href': '#', 'target': '_blank', 'class': 'cbi-button cbi-button-action', 'title': _('Open independently in a new tab') }, _('New Tab'));
 var iframe = E('iframe', { 'id': 'dash_iframe', 'src': 'about:blank', 'allow': 'fullscreen; clipboard-read; clipboard-write' });
 
@@ -396,7 +400,13 @@ function tryAutoLoginDoona() {
 	try {
 		var win = iframe.contentWindow;
 		if (!win) return;
-		var doc = iframe.contentDocument || win.document;
+		var doc = null;
+		try {
+			doc = iframe.contentDocument || win.document;
+		} catch (e) {
+			// Cross-origin iframe (expected when ports differ, e.g. 80 vs 9527)
+			return;
+		}
 		if (!doc) return;
 
 		var targetHost = getTargetHost(currentInfo.host);
@@ -404,7 +414,7 @@ function tryAutoLoginDoona() {
 		var origin = window.location.protocol + '//' + targetHost + ':' + port;
 		var secret = currentInfo.secret;
 
-		// 1. Direct localStorage initialization/injection
+		// 1. Direct localStorage initialization/injection (works if reverse-proxied on same origin)
 		if (win.localStorage) {
 			var rawProfiles = win.localStorage.getItem('doona-profiles');
 			var profiles = [];
@@ -444,17 +454,13 @@ function tryAutoLoginDoona() {
 			}
 		}
 	} catch (e) {
-		// Suppress expected Cross-Origin (SOP) exceptions when parent/iframe ports differ
+		// Suppress unexpected exceptions
 	}
 }
 
 iframe.addEventListener('load', function() {
 	if (dashType === 'doona') {
 		tryAutoLoginDoona();
-		setTimeout(tryAutoLoginDoona, 300);
-		setTimeout(tryAutoLoginDoona, 800);
-		setTimeout(tryAutoLoginDoona, 1500);
-		setTimeout(tryAutoLoginDoona, 3000);
 	}
 });
 
@@ -709,7 +715,7 @@ function loadInfo(forceReload) {
 
 statusEndpointPill.innerText = targetHost + ':' + port;
 if (dashType === 'doona' && data.secret) {
-	tokenPill.innerText = 'Token: ' + data.secret;
+	tokenText.innerText = data.secret;
 	tokenPill.style.display = 'inline-block';
 } else {
 	tokenPill.style.display = 'none';
