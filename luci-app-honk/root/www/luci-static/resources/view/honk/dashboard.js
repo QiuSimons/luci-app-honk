@@ -339,7 +339,7 @@ return view.extend({
 		var tokenPill = E('span', {
 			'class': 'label info',
 			'style': 'font-family: monospace; display: none; padding: 2px 6px; text-transform: none !important;'
-		}, [ 'Token: ', tokenText ]);
+		}, [ _('Token: '), tokenText ]);
 		var btnExternalOpen = E('a', { 'href': '#', 'target': '_blank', 'class': 'cbi-button cbi-button-action', 'title': _('Open independently in a new tab') }, _('New Tab'));
 		var iframe = E('iframe', { 'id': 'dash_iframe', 'src': 'about:blank', 'allow': 'fullscreen; clipboard-read; clipboard-write' });
 
