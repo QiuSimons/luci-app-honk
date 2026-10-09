@@ -121,7 +121,11 @@ return view.extend({
 					btnQuickEnable.innerText = enableBtnText;
 					if (resp && resp.success) {
 						quickEnableMsg.innerText = _('Successfully enabled! Restarting service and initializing dashboard...');
-						setTimeout(loadInfo, 2500);
+						honk.waitForHonkState(true).then(function() {
+							loadInfo(true);
+						}).catch(function() {
+							setTimeout(loadInfo, 2500);
+						});
 					} else {
 						honk.showNotification(null, E('p', _('Failed to enable:') + ' ' + (resp ? resp.message : _('Unknown error'))), 'error');
 					}
@@ -220,7 +224,15 @@ return view.extend({
 				honk.triggerDashboardDownload(url, dashType, dlLogBox, dlProgressWrap, function(success) {
 					btnStartDownload.disabled = false;
 					btnStartDownload.innerText = _('Start Download & Install Dashboard');
-					if (success) loadInfo(true);
+					if (success) {
+						honk.callHonkSwitchDashboardApi(dashType).then(function() {
+							return honk.waitForHonkState(true);
+						}).then(function() {
+							loadInfo(true);
+						}).catch(function() {
+							loadInfo(true);
+						});
+					}
 				});
 			}
 		}, _('Start Download & Install Dashboard'));
@@ -353,6 +365,13 @@ return view.extend({
 					btnConfirmUpdate.innerText = _('Close');
 					btnConfirmUpdate.onclick = function() { ui.hideModal(); };
 					btnCancelModal.style.display = 'none';
+					honk.callHonkSwitchDashboardApi(dashType).then(function() {
+						return honk.waitForHonkState(true);
+					}).then(function() {
+						loadInfo(true);
+					}).catch(function() {
+						loadInfo(true);
+					});
 				} else {
 					modalStatusAlert.className = 'alert-message warning';
 					modalStatusAlert.innerText = _('Installation failed. Please check logs.');
