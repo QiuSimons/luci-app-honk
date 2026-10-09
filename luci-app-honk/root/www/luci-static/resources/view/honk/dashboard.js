@@ -36,7 +36,14 @@ return view.extend({
 				'change': function(ev) {
 					var newType = ev.target.value;
 					sel.disabled = true;
-					honk.callHonkSwitchDashboardApi(newType).then(function() {
+					honk.switchDashboardAndWait(newType).then(function(res) {
+						if (res && res.pending) {
+							sel.disabled = false;
+							honk.showNotification(null, E('p', _('Saved, but the panel files are not installed yet — download the panel first.')), 'warning');
+							loadInfo(true);
+							return;
+						}
+
 						window.location.reload();
 					}).catch(function(err) {
 						sel.disabled = false;
@@ -116,19 +123,13 @@ return view.extend({
 			'click': function() {
 				btnQuickEnable.disabled = true;
 				btnQuickEnable.innerText = _('Enabling Native API and restarting HONK...');
-				honk.callHonkSwitchDashboardApi(dashType).then(function(resp) {
+				honk.switchDashboardAndWait(dashType).then(function(res) {
 					btnQuickEnable.disabled = false;
 					btnQuickEnable.innerText = enableBtnText;
-					if (resp && resp.success) {
-						quickEnableMsg.innerText = _('Successfully enabled! Restarting service and initializing dashboard...');
-						honk.waitForHonkState(true).then(function() {
-							loadInfo(true);
-						}).catch(function() {
-							setTimeout(loadInfo, 2500);
-						});
-					} else {
-						honk.showNotification(null, E('p', _('Failed to enable:') + ' ' + (resp ? resp.message : _('Unknown error'))), 'error');
-					}
+					quickEnableMsg.innerText = (res && res.pending)
+						? _('Saved, but the panel files are not installed yet — download the panel first.')
+						: _('Successfully enabled! Restarting service and initializing dashboard...');
+					loadInfo(true);
 				}).catch(function(err) {
 					btnQuickEnable.disabled = false;
 					btnQuickEnable.innerText = enableBtnText;
@@ -225,9 +226,10 @@ return view.extend({
 					btnStartDownload.disabled = false;
 					btnStartDownload.innerText = _('Start Download & Install Dashboard');
 					if (success) {
-						honk.callHonkSwitchDashboardApi(dashType).then(function() {
-							return honk.waitForHonkState(true);
-						}).then(function() {
+						honk.switchDashboardAndWait(dashType).then(function(res) {
+							if (res && res.pending)
+								honk.showNotification(null, E('p', _('Saved, but the panel files are not installed yet — download the panel first.')), 'warning');
+
 							loadInfo(true);
 						}).catch(function() {
 							loadInfo(true);
@@ -365,13 +367,14 @@ return view.extend({
 					btnConfirmUpdate.innerText = _('Close');
 					btnConfirmUpdate.onclick = function() { ui.hideModal(); };
 					btnCancelModal.style.display = 'none';
-					honk.callHonkSwitchDashboardApi(dashType).then(function() {
-						return honk.waitForHonkState(true);
-					}).then(function() {
-						loadInfo(true);
-					}).catch(function() {
-						loadInfo(true);
-					});
+						honk.switchDashboardAndWait(dashType).then(function(res) {
+							if (res && res.pending)
+								honk.showNotification(null, E('p', _('Saved, but the panel files are not installed yet — download the panel first.')), 'warning');
+
+							loadInfo(true);
+						}).catch(function() {
+							loadInfo(true);
+						});
 				} else {
 					modalStatusAlert.className = 'alert-message warning';
 					modalStatusAlert.innerText = _('Installation failed. Please check logs.');
