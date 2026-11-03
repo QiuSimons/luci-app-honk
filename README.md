@@ -1,124 +1,94 @@
 # luci-app-honk
 
-OpenWrt 上的 honk（基于 eBPF 的高性能透明代理引擎，dae 兼容）LuCI 管理界面与安装包。
+OpenWrt 上的 honk（eBPF 透明代理，兼容 dae）LuCI 界面与安装包。
 
-## 仓库组件
+## 软件包
 
-本仓库包含两个 OpenWrt 软件包：
+| 包 | 内容 |
+| --- | --- |
+| `luci-app-honk` | LuCI 页面、rpcd 服务、Doona 静态资源 |
+| `honk` | 从 daeuniverse/honk 指定 commit 编译的 `honk-core`，以及 init.d 脚本和默认配置 |
 
-| 包名 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| **`luci-app-honk`** | 管理界面 | 基于 LuCI 与 Ucode 构建的 Web 控制界面与 rpcd 服务 |
-| **`honk`** | 核心服务 | 从 [daeuniverse/honk](https://github.com/daeuniverse/honk) 源码原生编译静态 `honk-core`，并配置 init.d 守护进程 |
+`honk-core` 目前支持 x86_64 和 aarch64_generic，构建脚本在 `honk/` 内。
 
-> [!NOTE]
-> `honk-core` 不再从上游 Release 拉取，而是由本仓库 CI 在宿主机上原生编译（Rust + Zig + bpf-linker）。
-> 当前覆盖 `x86_64` 与 `aarch64_generic`，产物为静态 musl 二进制。
+## 编译
 
-## 编译与安装
+### 宿主机依赖
 
-### 1. 宿主机构建依赖 (Ubuntu/Debian)
-
-以下命令在**宿主机**安装 `honk-core` 的构建工具；OpenWrt SDK/容器只消费第 2 步生成的二进制，不需要 Rust/Zig。
+构建 `honk-core` 需要 Rust、Zig 和 bpf-linker。以下命令以 Ubuntu/Debian x86_64 为例：
 
 ```bash
-# 基础依赖与 LLVM/BPF 工具链
 sudo apt-get update
 sudo apt-get install -y clang llvm libbpf-dev cmake libclang-dev zstd \
   make perl file binutils git curl xz-utils pkg-config ca-certificates
 
-# Rust（版本由 honk 源码内的 rust-toolchain.toml 固定；-y 免交互）
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path
 . "$HOME/.cargo/env"
 
-# 从 pinned honk commit 解析工具链版本
+# 从 honk/Makefile 的 pin 解析版本
 eval "$(./honk/honk_toolchain.sh)"
-echo "bpf-linker ${BPF_LINKER_VERSION}, zig ${ZIG_VERSION}"
 
-# bpf-linker (eBPF 字节码链接器)
-curl -fsSL -o /tmp/bpf-linker.tar.zst "https://github.com/aya-rs/bpf-linker/releases/download/v${BPF_LINKER_VERSION}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
+curl -fsSL -o /tmp/bpf-linker.tar.zst \
+  "https://github.com/aya-rs/bpf-linker/releases/download/v${BPF_LINKER_VERSION}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
 echo "${BPF_LINKER_SHA256}  /tmp/bpf-linker.tar.zst" | sha256sum -c -
 sudo tar --zstd -xf /tmp/bpf-linker.tar.zst -C /usr/local/bin
 
-# Zig（按宿主机架构；示例为 x86_64 宿主机）
-curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+curl -fsSL -o /tmp/zig.tar.xz \
+  "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
 sudo tar -xJf /tmp/zig.tar.xz -C /usr/local
 sudo ln -sf "/usr/local/zig-x86_64-linux-${ZIG_VERSION}/zig" /usr/local/bin/zig
-zig version
 ```
 
-> `rustup` 已用 `-y` 免交互；`sudo` 若无 NOPASSWD 仍会要密码，无人值守环境请用 root 或配置 NOPASSWD。
+Zig 的下载包按宿主机架构选择，上面是 x86_64。`rustup` 用 `-y` 免交互；`sudo` 没有 NOPASSWD 时需要密码。
 
-### 2. 预编译核心二进制
+### 编译 honk-core
 
-`honk/Makefile` 在 `files/honk-core.bin` 缺失时会**自动调用**同目录的 `build_honk_core.sh`
-（依赖第 1 节的宿主工具链与网络）；CI 的 prebuild job 和 OpenWrt-Add 的 prebuild 已在构建前提供二进制，
-不会触发这段宿主构建。
+`honk/Makefile` 在 `honk/files/honk-core.bin` 不存在时调用同目录的 `build_honk_core.sh`。CI 和 OpenWrt-Add 的 prebuild 会提前生成二进制，构建时跳过。
 
-构建脚本就在 `honk/` 包内，随包一起复制；单独把 `honk/` 放到任意 package 目录也能自动构建，
-不满足宿主工具链/网络时预置 `honk/files/honk-core.bin` 即可。
-也可以手动预编译（离线构建或预置产物时）：
+手动生成：
 
 ```bash
-# 编译 x86_64 二进制至 honk/files/honk-core.bin
 ./honk/build_honk_core.sh x86_64
-
-# 或编译 aarch64 二进制
 ./honk/build_honk_core.sh aarch64_generic
 ```
 
-自动/手动构建都会校验产物：必须是目标架构 ELF，且 musl 目标必须静态链接——否则直接失败，
-避免把动态链接的二进制带进 OpenWrt 打包阶段（报 `libc.so.6` 缺失依赖）。
-若构建环境禁止宿主网络/执行，先在有工具链的机器上生成二进制再放回 `honk/files/`。
+脚本会检查产物是目标架构的 ELF 且静态链接；目标架构变化时按 `honk-core.bin.stamp` 自动重建。构建脚本随 `honk/` 一起复制，单独放进 OpenWrt 也能构建。离线环境把 `honk-core.bin` 放到 `honk/files/` 即可。
 
-> 脚本构建会写 `honk-core.bin.stamp`；目标架构变化时会自动重建。手动拷贝的二进制没有 stamp，会被视为预置产物直接使用。
+### 编译 OpenWrt 包
 
-### 3. OpenWrt 软件包编译
+```bash
+git clone https://github.com/QiuSimons/luci-app-honk package/honk
+make menuconfig   # Network -> Web Servers/Proxies -> luci-app-honk
+make package/honk/compile V=s
+make package/luci-app-honk/compile V=s
+```
 
-1. 拉取源码至 OpenWrt 源码树：
+## 配置文件
 
-   ```bash
-   git clone https://github.com/QiuSimons/luci-app-honk package/honk
-   ```
-
-2. 配置并编译：
-
-   ```bash
-   make menuconfig
-   # 选择：Network -> Web Servers/Proxies -> luci-app-honk
-
-   make package/honk/compile V=s
-   make package/luci-app-honk/compile V=s
-   ```
-
-## 配置文件结构
-
-honk 采用模块化拆分配置，主配置与子模块均位于 `/etc/honk/`：
+honk 的配置在 `/etc/honk/`：
 
 ```text
 /etc/honk/
-├── config.dae          # 主配置文件
-├── config.d/           # 拆分模块目录
+├── config.dae          # 主配置
+├── config.d/
 │   ├── node.dae        # 节点与订阅
-│   ├── route.dae       # 分流路由规则
-│   ├── dns.dae         # DNS 解析与分流
-│   └── api.dae         # Native API 与控制面板鉴权
-└── state/              # 运行状态与 SQLite 数据库 (honk.db)
+│   ├── route.dae       # 分流规则
+│   ├── dns.dae         # DNS
+│   └── api.dae         # Native API 与控制面板
+└── state/              # 运行状态与 honk.db
 ```
 
-> [!TIP]
-> 首次使用前，请先编辑 `/etc/honk/config.d/node.dae` 替换示例中的节点与订阅。
+首次使用前编辑 `/etc/honk/config.d/node.dae`，填入节点和订阅。
 
-## 控制面板 (Doona)
+## Doona
 
 ![Doona 控制面板](PIC/PIC.jpg)
 
-> [!NOTE]
-> **Doona** 静态资源随 `luci-app-honk` 安装，`honk-core` 已包含 `native-api`；不再需要手动替换 debug 版核心。
+Doona 的静态资源随 `luci-app-honk` 安装，`honk-core` 包含 `native-api`，不需要替换 debug 版核心。
 
-## 维护与版本更新
+## 更新
 
-维护者可通过自带脚本自动获取 upstream 最新 commit 并更新 `PKG_VERSION` 与 `HONK_SRC_VERSION`：
+更新 upstream 版本：
 
 ```bash
 ./scripts/update_honk_version.sh
