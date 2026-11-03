@@ -11,6 +11,11 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'honk/**'
+      - 'luci-app-honk/**'
+      - 'scripts/**'
+      - '.github/workflows/build-packages.yml'
 
 permissions:
   contents: write
@@ -30,7 +35,7 @@ jobs:
       sdks: ${{ steps.matrix.outputs.sdks }}
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Generate version metadata
         id: meta
@@ -40,7 +45,8 @@ jobs:
           pkg_release=$(grep '^PKG_RELEASE:=' honk/Makefile | head -n 1 | cut -d= -f2)
 
           version="${pkg_version}-r${pkg_release}"
-          release_tag="honk_${version}"
+          # git ref 不允许 '~'（PKG_VERSION 的 Debian 风格分隔符），只在 tag 里替换
+          release_tag="honk_$(printf '%s' "$version" | tr '~' '_')"
           release_name="honk_${version}"
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
@@ -88,8 +94,8 @@ jobs:
 
           echo "sdks=$(jq -nc --args '$ARGS.positional' -- "${sdks[@]}")" >> "$GITHUB_OUTPUT"
 
-  build:
-    name: Build ${{ matrix.arch }}-openwrt-${{ matrix.sdk }}
+  prebuild:
+    name: Prebuild honk-core ${{ matrix.arch }}
     runs-on: ubuntu-latest
     needs: prepare
     strategy:
@@ -97,19 +103,82 @@ jobs:
       matrix:
         arch:
           - aarch64_generic
-          - aarch64_cortex-a53
-          - aarch64_cortex-a72
-          - aarch64_cortex-a76
+          - x86_64
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Resolve honk toolchain pins
+        id: honk-toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/honk_toolchain.sh | tee "$RUNNER_TEMP/honk-toolchain.env"
+          . "$RUNNER_TEMP/honk-toolchain.env"
+          echo "zig_version=${ZIG_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install host build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang llvm libbpf-dev cmake libclang-dev zstd
+          . "$RUNNER_TEMP/honk-toolchain.env"
+          curl -fsSL --retry 3 -o /tmp/bpf-linker.tar.zst \
+            "https://github.com/aya-rs/bpf-linker/releases/download/v${BPF_LINKER_VERSION}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
+          echo "${BPF_LINKER_SHA256}  /tmp/bpf-linker.tar.zst" | sha256sum -c -
+          sudo tar --zstd -xf /tmp/bpf-linker.tar.zst -C /usr/local/bin
+          bpf-linker --version
+
+      - name: Setup Zig for BoringSSL musl cross-compilation
+        uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ steps.honk-toolchain.outputs.zig_version }}
+
+      - name: Build honk-core binary
+        shell: bash
+        run: |
+          ./scripts/build_honk_core.sh "${{ matrix.arch }}" honk/files/honk-core.bin
+
+      - name: Upload honk-core binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: honk-core-${{ matrix.arch }}
+          path: honk/files/honk-core.bin
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  build:
+    name: Build ${{ matrix.arch }}-openwrt-${{ matrix.sdk }}
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - prebuild
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - aarch64_generic
           - x86_64
         sdk: ${{ fromJson(needs.prepare.outputs.sdks) }}
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Remove vmlinux-btf dependency for CI
+      - name: Download honk-core binary
+        uses: actions/download-artifact@v8
+        with:
+          name: honk-core-${{ matrix.arch }}
+          path: honk/files
+
+      - name: Remove KERNEL_DEBUG_INFO_BTF dependency for CI
         shell: bash
         run: |
+          # No KERNEL_DEBUG_INFO_BTF in the SDK: make the kernel-BTF choice
+          # selectable so the conditional vmlinux-btf dep stays inactive.
           sed -i '/depends on KERNEL_DEBUG_INFO_BTF/d' honk/Makefile
 
       - name: Build packages
@@ -121,41 +190,28 @@ jobs:
           PACKAGES: honk luci-app-honk
           NO_REFRESH_CHECK: true
           NO_SHFMT_CHECK: true
-          UPSTREAM_URL: https://openwrt.fastly.net
-          FILE_HOST: https://openwrt.fastly.net
-
-      - name: Show built files
-        shell: bash
-        run: |
-          echo "=== Built package files ==="
-          find bin/packages -type f | grep -E '\.(ipk|apk)$' || true
-          echo "==========================="
 
       - name: Prepare renamed artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          shopt -s nullglob
-          for f in bin/packages/${{ matrix.arch }}/packages_ci/*.{ipk,apk}; do
+          while IFS= read -r -d '' f; do
             base="$(basename "$f")"
+            case "$base" in *honk*) ;; *) continue ;; esac
             ext="${base##*.}"
             name="${base%.*}"
-
-            if [[ "$name" == *"${{ matrix.arch }}"* ]] || [[ "$name" == *"all"* ]] || [[ "$name" == luci-* ]]; then
-              new_name="${name}-openwrt-${{ matrix.sdk }}.${ext}"
-            else
-              new_name="${name}-${{ matrix.arch }}-openwrt-${{ matrix.sdk }}.${ext}"
-            fi
-
+            case "$name" in
+              luci-*) new_name="${name}-openwrt-${{ matrix.sdk }}.${ext}" ;;
+              *)      new_name="${name}-${{ matrix.arch }}-openwrt-${{ matrix.sdk }}.${ext}" ;;
+            esac
             cp "$f" "dist/${new_name}"
-          done
+          done < <(find bin/packages -type f \( -name '*.ipk' -o -name '*.apk' \) -print0)
 
-          files=(dist/*)
-          if [ ${#files[@]} -eq 0 ]; then
+          compgen -G 'dist/*' >/dev/null || {
             echo "::error::No package files were copied to dist"
             exit 1
-          fi
+          }
 
           ls -lah dist
 
@@ -180,6 +236,7 @@ jobs:
         with:
           path: release-dist
           merge-multiple: true
+          pattern: '*-openwrt-*'
 
       - name: Create or update GitHub release
         uses: softprops/action-gh-release@v3

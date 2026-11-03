@@ -10,10 +10,6 @@ on:
         type: boolean
         default: false
 
-env:
-  # 激进模式开关：设为 true 使用 Glassyiris/honk 开发者测试源码及最新二进制（含 prerelease），设为 false 切回官方 daeuniverse/honk
-  AGGRESSIVE_MODE: false
-
 permissions:
   contents: write
   actions: write
@@ -24,17 +20,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Update honk version
         env:
           INPUT_AGGRESSIVE: ${{ github.event.inputs.aggressive }}
         run: |
-          if [ -n "$INPUT_AGGRESSIVE" ]; then
-            AGGRESSIVE_MODE="$INPUT_AGGRESSIVE" bash scripts/update_honk_version.sh
+          if [ "$INPUT_AGGRESSIVE" = "true" ]; then
+            UPSTREAM_REPO=Glassyiris/honk bash scripts/update_honk_version.sh
           else
             bash scripts/update_honk_version.sh
           fi
@@ -55,20 +50,16 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No version change."
           else
-            TAG="$(grep '^HONK_RELEASE_TAG:=' honk/Makefile | cut -d= -f2 || true)"
             VER="$(grep '^PKG_VERSION:=' honk/Makefile | cut -d= -f2 || true)"
-            git commit -m "auto: update honk ${TAG} (${VER}) and doona dashboard"
+            git commit -m "auto: update honk (${VER}) and doona dashboard"
 
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Push changes
         if: steps.commit.outputs.changed == 'true'
-        uses: ad-m/github-push-action@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: master
+        shell: bash
+        run: git push origin master
 
       - name: Trigger build packages
         if: steps.commit.outputs.changed == 'true'
