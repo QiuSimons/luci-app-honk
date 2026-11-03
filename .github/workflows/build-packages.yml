@@ -114,7 +114,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./scripts/honk_toolchain.sh | tee "$RUNNER_TEMP/honk-toolchain.env"
+          ./honk/honk_toolchain.sh | tee "$RUNNER_TEMP/honk-toolchain.env"
           . "$RUNNER_TEMP/honk-toolchain.env"
           echo "zig_version=${ZIG_VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -139,7 +139,7 @@ jobs:
       - name: Build honk-core binary
         shell: bash
         run: |
-          ./scripts/build_honk_core.sh "${{ matrix.arch }}" honk/files/honk-core.bin
+          ./honk/build_honk_core.sh "${{ matrix.arch }}" honk/files/honk-core.bin
 
       - name: Upload honk-core binary
         uses: actions/upload-artifact@v7

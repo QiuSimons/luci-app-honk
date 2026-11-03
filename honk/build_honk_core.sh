@@ -1,15 +1,30 @@
 #!/usr/bin/env bash
 # Build honk-core for an OpenWrt arch/target triple.
 #
-#   ./scripts/build_honk_core.sh <arch|target_triple> [output_file] [source_dir]
+#   ./honk/build_honk_core.sh [--if-needed] <arch|target_triple> [output_file] [source_dir]
+#
+# --if-needed: skip when the output exists and its .stamp matches the target
+# (or has no stamp, i.e. a prebuilt artifact); rebuild on a target mismatch.
 set -euo pipefail
 
-TARGET_IN="${1:?usage: $0 <arch|target_triple> [output_file] [source_dir]}"
+IF_NEEDED=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --if-needed) IF_NEEDED=1; shift ;;
+    *) break ;;
+  esac
+done
+
+TARGET_IN="${1:?usage: $0 [--if-needed] <arch|target_triple> [output_file] [source_dir]}"
 OUT_FILE="${2:-}"
 SRC_DIR="${3:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ -f "${HOME:-}/.cargo/env" ]; then
+  . "${HOME:-}/.cargo/env"
+fi
+export PATH="${HOME:-}/.cargo/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 
 case "$TARGET_IN" in
   x86_64|x86_64-unknown-linux-musl)
@@ -26,18 +41,33 @@ case "$TARGET_IN" in
     ;;
 esac
 
-OUT_FILE="${OUT_FILE:-$REPO_ROOT/honk/files/honk-core.bin}"
+OUT_FILE="${OUT_FILE:-$SCRIPT_DIR/files/honk-core.bin}"
 case "$OUT_FILE" in
   /*) ;;
   *) OUT_FILE="$PWD/$OUT_FILE" ;;
 esac
 
-MAKEFILE="$REPO_ROOT/honk/Makefile"
+if [ "$IF_NEEDED" = 1 ] && [ -f "$OUT_FILE" ]; then
+  if [ ! -f "$OUT_FILE.stamp" ]; then
+    echo "==> using prebuilt honk-core (no stamp): $OUT_FILE"
+    exit 0
+  fi
+  if [ "$(cat "$OUT_FILE.stamp")" = "$RUST_TARGET" ]; then
+    echo "==> honk-core is up to date: $OUT_FILE"
+    exit 0
+  fi
+  echo "==> honk-core target changed, rebuilding: $OUT_FILE"
+fi
+
+# Building: drop the old artifact so a failed build cannot be reused.
+rm -f "$OUT_FILE" "$OUT_FILE.stamp"
+
+MAKEFILE="${HONK_MAKEFILE:-$SCRIPT_DIR/Makefile}"
 if [ -n "$SRC_DIR" ]; then
-  eval "$("$REPO_ROOT/scripts/honk_toolchain.sh" --src "$SRC_DIR" "$MAKEFILE")"
+  eval "$("$SCRIPT_DIR/honk_toolchain.sh" --src "$SRC_DIR" "$MAKEFILE")"
 else
-  eval "$("$REPO_ROOT/scripts/honk_toolchain.sh" "$MAKEFILE")"
-  SRC_DIR="$REPO_ROOT/honk-src"
+  eval "$("$SCRIPT_DIR/honk_toolchain.sh" "$MAKEFILE")"
+  SRC_DIR="$SCRIPT_DIR/honk-src"
   CACHED_REV=$(git -C "$SRC_DIR" rev-parse HEAD 2>/dev/null || true)
   if [ -d "$SRC_DIR/crates/honk-core" ] && [ "$CACHED_REV" = "$HONK_SRC_VERSION" ]; then
     echo "==> Reusing $SRC_DIR at ${HONK_SRC_VERSION}"
@@ -127,6 +157,7 @@ fi
 mkdir -p "$(dirname "$OUT_FILE")"
 cp -f "$BUILT_BIN" "$OUT_FILE"
 chmod +x "$OUT_FILE"
+printf '%s\n' "$RUST_TARGET" > "$OUT_FILE.stamp"
 
 echo "==> Build succeeded: $OUT_FILE"
 echo "==> $FILE_DESC"

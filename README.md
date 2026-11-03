@@ -17,22 +17,22 @@ OpenWrt 上的 honk（基于 eBPF 的高性能透明代理引擎，dae 兼容）
 
 ## 编译与安装
 
-### 1. 宿主机构建依赖 (以 Ubuntu 为例)
+### 1. 宿主机构建依赖 (Ubuntu/Debian)
 
-编译 `honk-core` 核心二进制需在宿主机配置 Rust、bpf-linker 与 Zig（用于 BoringSSL musl 交叉编译）：
+以下命令在**宿主机**安装 `honk-core` 的构建工具；OpenWrt SDK/容器只消费第 2 步生成的二进制，不需要 Rust/Zig。
 
 ```bash
 # 基础依赖与 LLVM/BPF 工具链
 sudo apt-get update
-sudo apt-get install -y clang llvm libbpf-dev cmake libclang-dev zstd
+sudo apt-get install -y clang llvm libbpf-dev cmake libclang-dev zstd \
+  make perl file binutils git curl xz-utils pkg-config ca-certificates
 
-# Rust（版本由 honk 源码内的 rust-toolchain.toml 固定，eBPF 的 nightly 工具链由脚本自动安装）
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup target add x86_64-unknown-linux-musl
-rustup target add aarch64-unknown-linux-musl
+# Rust（版本由 honk 源码内的 rust-toolchain.toml 固定；-y 免交互）
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path
+. "$HOME/.cargo/env"
 
 # 从 pinned honk commit 解析工具链版本
-eval "$(./scripts/honk_toolchain.sh)"
+eval "$(./honk/honk_toolchain.sh)"
 echo "bpf-linker ${BPF_LINKER_VERSION}, zig ${ZIG_VERSION}"
 
 # bpf-linker (eBPF 字节码链接器)
@@ -40,25 +40,38 @@ curl -fsSL -o /tmp/bpf-linker.tar.zst "https://github.com/aya-rs/bpf-linker/rele
 echo "${BPF_LINKER_SHA256}  /tmp/bpf-linker.tar.zst" | sha256sum -c -
 sudo tar --zstd -xf /tmp/bpf-linker.tar.zst -C /usr/local/bin
 
-# Zig ${ZIG_VERSION}（由 pinned commit 决定，构建脚本会校验）
-# 从 https://ziglang.org/download/ 下载解压并加入 PATH
+# Zig（按宿主机架构；示例为 x86_64 宿主机）
+curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+sudo tar -xJf /tmp/zig.tar.xz -C /usr/local
+sudo ln -sf "/usr/local/zig-x86_64-linux-${ZIG_VERSION}/zig" /usr/local/bin/zig
+zig version
 ```
+
+> `rustup` 已用 `-y` 免交互；`sudo` 若无 NOPASSWD 仍会要密码，无人值守环境请用 root 或配置 NOPASSWD。
 
 ### 2. 预编译核心二进制
 
-在执行 OpenWrt 编译前，使用脚本生成对应架构的静态核心二进制（源码按 `honk/Makefile` 中
-`HONK_SRC_URL` / `HONK_SRC_VERSION` 固定到 commit，缓存在 `honk-src/`）：
+`honk/Makefile` 在 `files/honk-core.bin` 缺失时会**自动调用**同目录的 `build_honk_core.sh`
+（依赖第 1 节的宿主工具链与网络）；CI 的 prebuild job 和 OpenWrt-Add 的 prebuild 已在构建前提供二进制，
+不会触发这段宿主构建。
+
+构建脚本就在 `honk/` 包内，随包一起复制；单独把 `honk/` 放到任意 package 目录也能自动构建，
+不满足宿主工具链/网络时预置 `honk/files/honk-core.bin` 即可。
+也可以手动预编译（离线构建或预置产物时）：
 
 ```bash
 # 编译 x86_64 二进制至 honk/files/honk-core.bin
-./scripts/build_honk_core.sh x86_64
+./honk/build_honk_core.sh x86_64
 
 # 或编译 aarch64 二进制
-./scripts/build_honk_core.sh aarch64_generic
+./honk/build_honk_core.sh aarch64_generic
 ```
 
-脚本会在结束前校验产物：必须是目标架构 ELF，且 musl 目标必须静态链接——否则直接失败，
+自动/手动构建都会校验产物：必须是目标架构 ELF，且 musl 目标必须静态链接——否则直接失败，
 避免把动态链接的二进制带进 OpenWrt 打包阶段（报 `libc.so.6` 缺失依赖）。
+若构建环境禁止宿主网络/执行，先在有工具链的机器上生成二进制再放回 `honk/files/`。
+
+> 脚本构建会写 `honk-core.bin.stamp`；目标架构变化时会自动重建。手动拷贝的二进制没有 stamp，会被视为预置产物直接使用。
 
 ### 3. OpenWrt 软件包编译
 
@@ -101,7 +114,7 @@ honk 采用模块化拆分配置，主配置与子模块均位于 `/etc/honk/`�
 ![Doona 控制面板](PIC/PIC.jpg)
 
 > [!NOTE]
-> 当前 **Doona** 控制面板仍在积极开发中。如需尝试体验相关功能（如 Native API、配置在线编辑与 GeoData 规则集更新等），需要自行替换 debug 版本的 `honk-core` 核心（替换路径为 `/usr/bin/honk-core`）。
+> **Doona** 静态资源随 `luci-app-honk` 安装，`honk-core` 已包含 `native-api`；不再需要手动替换 debug 版核心。
 
 ## 维护与版本更新
 

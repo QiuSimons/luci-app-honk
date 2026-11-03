@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Resolve the toolchain pins for the honk commit pinned by the package Makefile.
 #
-#   ./scripts/honk_toolchain.sh [--src DIR] [Makefile]
+#   ./honk/honk_toolchain.sh [--src DIR] [Makefile]
 #
 # Prints HONK_SRC_URL / HONK_SRC_VERSION plus BPF_LINKER_VERSION / SHA256 and
 # ZIG_VERSION, read from that commit's .github/ci/pins.env and release.yml (or
@@ -9,7 +9,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SRC_DIR=""
 MAKEFILE=""
@@ -19,7 +18,7 @@ while [ $# -gt 0 ]; do
     *) MAKEFILE="$1"; shift ;;
   esac
 done
-MAKEFILE="${MAKEFILE:-${HONK_MAKEFILE:-$REPO_ROOT/honk/Makefile}}"
+MAKEFILE="${MAKEFILE:-${HONK_MAKEFILE:-$SCRIPT_DIR/Makefile}}"
 
 [ -f "$MAKEFILE" ] || { echo "ERROR: Makefile not found: $MAKEFILE" >&2; exit 1; }
 
