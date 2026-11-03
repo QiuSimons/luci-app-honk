@@ -8,6 +8,7 @@
 'require dom';
 'require view';
 'require form';
+'require session';
 
 function showNotification(title, children, type, timeout) {
 	timeout = (timeout != null) ? timeout : 3000;
@@ -627,6 +628,26 @@ function initCodeMirror(textarea, onSaveCallback) {
 	});
 }
 
+// A page that is filtered out of the menu can still be opened by its URL; say
+// why it is unavailable instead of rendering an editor that does not apply.
+function renderHiddenPage(title, reason) {
+	var hint = (reason === 'advanced')
+		? _('This page belongs to the advanced mode. Enable Advanced Settings in the global settings to use it.')
+		: _('This page belongs to a web dashboard. Select one in the global settings to use it.');
+
+	return E('div', { 'class': 'cbi-map' }, [
+		E('style', {}, '.cbi-page-actions { display: none !important; }'),
+		E('h2', {}, title),
+		E('div', { 'class': 'cbi-section' }, [
+			E('p', {}, hint),
+			E('p', {}, E('a', {
+				'class': 'btn cbi-button cbi-button-action',
+				'href': L.url('admin', 'services', 'honk', 'global')
+			}, _('Open Global Settings')))
+		])
+	]);
+}
+
 function createConfigFileView(filePath, mapTitle, mapDesc, fieldTitle, successMsg, needRestart) {
 	return view.extend({
 		load: function() {
@@ -634,6 +655,11 @@ function createConfigFileView(filePath, mapTitle, mapDesc, fieldTitle, successMs
 		},
 
 		render: function() {
+			var reason = hiddenTabReason(currentTab());
+
+			if (reason)
+				return renderHiddenPage(mapTitle, reason);
+
 			var m = new form.Map('honk', mapTitle, mapDesc);
 
 			var s = m.section(form.NamedSection, '_status');
@@ -700,73 +726,174 @@ function createConfigFileView(filePath, mapTitle, mapDesc, fieldTitle, successMs
 }
 
 
-function updateTabVisibilityFromSections(sections) {
-	var s = (sections && sections[0]) ? sections[0] : (uci.get_first('honk', 'honk') || {});
-	var isAdvanced = (s.advanced === '1');
-	var dashType = s.dashboard || '';
+// ---------------------------------------------------------------------------
+// Pages that do not apply to the current settings
+//
+// The DNS, node and routing editors belong to advanced mode, the API editor to
+// a selected dashboard. menu.d cannot express that: its depends.uci matches
+// option existence only, and the evaluated menu is cached in
+// /tmp/luci-indexcache. The entries are filtered out here instead - in the menu
+// tree every theme builds its navigation and page tabs from, plus the links of
+// a bar a theme has already painted, matched by their target instead of by
+// theme specific classes.
+// ---------------------------------------------------------------------------
 
-	var hiddenTabs = [];
-	if (!isAdvanced) {
-		hiddenTabs.push('dns', 'node', 'route');
-	}
-	if (dashType === 'none') {
-		hiddenTabs.push('api');
-	}
+var ADVANCED_TABS = [ 'dns', 'node', 'route' ];
+var MENU_BASE_KEY = 'honk-menu-base';
+var MENU_STATE_KEY = 'honk-menu-state';
 
-	applyTabCss(hiddenTabs);
-
-	var currentTab = (window.L && L.env && Array.isArray(L.env.dispatchpath)) ? L.env.dispatchpath[3] : '';
-	if (!currentTab) {
-		var m = window.location.pathname.match(/\/honk\/([a-z0-9_-]+)/);
-		if (m) currentTab = m[1];
-	}
-	if (currentTab && hiddenTabs.indexOf(currentTab) !== -1) {
-		window.location.href = L.url('admin/services/honk/global');
-	}
+function honkSettings() {
+	return uci.get_first('honk', 'honk') || {};
 }
 
-// Tab visibility control:
-// - dns, node, route are hidden when advanced=0
-// - api is hidden when dashboard=none
-function applyTabVisibility() {
-	var sections = uci.sections('honk', 'honk');
-	if (sections && sections.length) {
-		updateTabVisibilityFromSections(sections);
-		return Promise.resolve();
-	}
+function getHiddenTabs() {
+	var settings = honkSettings();
+	var hidden = [];
 
+	if (settings.advanced !== '1')
+		hidden = hidden.concat(ADVANCED_TABS);
+
+	if (settings.dashboard === 'none')
+		hidden.push('api');
+
+	return hidden;
+}
+
+// The setting that keeps a page hidden, or null when the page applies.
+function hiddenTabReason(tab) {
+	var settings = honkSettings();
+
+	if (tab && ADVANCED_TABS.indexOf(tab) !== -1 && settings.advanced !== '1')
+		return 'advanced';
+
+	if (tab === 'api' && settings.dashboard === 'none')
+		return 'dashboard';
+
+	return null;
+}
+
+function currentTab() {
+	var dispatch = (window.L && L.env && Array.isArray(L.env.dispatchpath)) ? L.env.dispatchpath : [];
+	var fromUrl = window.location.pathname.match(/\/honk\/([a-z0-9_-]+)/);
+
+	return (dispatch.length > 3) ? dispatch[3] : (fromUrl ? fromUrl[1] : '');
+}
+
+function honkMenuNode(tree) {
+	var node = tree;
+
+	[ 'admin', 'services', 'honk' ].forEach(function(name) {
+		node = (node && node.children) ? node.children[name] : null;
+	});
+
+	return node || null;
+}
+
+// Filter the shared menu tree, and keep the filtered copy in LuCI's session
+// cache so that the following page loads paint the same navigation.
+function hideMenuEntries(hidden) {
+	var state = hidden.join(',');
+
+	return ui.menu.load().then(function(tree) {
+		if (!L.isObject(tree) || !L.isObject(tree.children))
+			return;
+
+		var cached = session.getLocalData('menu');
+		var base = session.getLocalData(MENU_BASE_KEY);
+
+		// Keep the unfiltered tree, so that entries come back when the setting
+		// that hid them is enabled again. LuCI drops its own copy when packages
+		// change, and the tree fetched then is the new reference.
+		if (!L.isObject(cached) || !L.isObject(base)) {
+			base = JSON.parse(JSON.stringify(tree));
+			session.setLocalData(MENU_BASE_KEY, base);
+		}
+
+		if (L.isObject(cached) && session.getLocalData(MENU_STATE_KEY) === state)
+			return;
+
+		var filtered = JSON.parse(JSON.stringify(base));
+		var honk = honkMenuNode(filtered);
+
+		if (honk && L.isObject(honk.children)) {
+			hidden.forEach(function(name) {
+				if (honk.children[name])
+					honk.children[name].satisfied = false;
+			});
+		}
+
+		ui.menu.menu = filtered;
+
+		session.setLocalData('menu', filtered);
+		session.setLocalData(MENU_STATE_KEY, state);
+	}).catch(function() {});
+}
+
+function hideTabLinks(hidden) {
+	if (!hidden.length)
+		return;
+
+	var targets = hidden.map(function(name) {
+		return L.url('admin', 'services', 'honk', name);
+	});
+
+	document.querySelectorAll('a[href]').forEach(function(link) {
+		if (link.closest('#view') || targets.indexOf(link.pathname) === -1)
+			return;
+
+		(link.closest('li') || link).style.setProperty('display', 'none', 'important');
+	});
+}
+
+var lateLinks = null;
+
+// Themes paint their navigation once the menu promise settles - after this
+// module may have been evaluated - and some of them rebuild parts of it when it
+// is opened (the vantage flyout does), so keep watching for those links.
+function watchLateLinks() {
+	if (lateLinks || !window.MutationObserver)
+		return;
+
+	var queued = false;
+
+	lateLinks = new MutationObserver(function() {
+		if (queued)
+			return;
+
+		queued = true;
+
+		window.setTimeout(function() {
+			queued = false;
+			hideTabLinks(getHiddenTabs());
+		}, 100);
+	});
+
+	lateLinks.observe(document.body, { childList: true, subtree: true });
+}
+
+// dns, node and route are hidden when advanced=0, api when dashboard=none.
+function applyTabVisibility() {
 	return uci.load('honk').then(function() {
-		updateTabVisibilityFromSections(uci.sections('honk', 'honk'));
+		var hidden = getHiddenTabs();
+
+		hideTabLinks(hidden);
+		watchLateLinks();
+
+		return hideMenuEntries(hidden);
 	}).catch(function() {
 	});
 }
 
-function applyTabCss(hiddenTabs) {
-	var styleId = 'honk-tab-visibility-style';
-	var existing = document.getElementById(styleId);
-	if (!existing) {
-		existing = document.createElement('style');
-		existing.id = styleId;
-		document.head.appendChild(existing);
-	}
-	if (!hiddenTabs || hiddenTabs.length === 0) {
-		existing.textContent = '';
-	} else {
-		existing.textContent = hiddenTabs.map(function(tab) {
-			return '#tabmenu .tabmenu-item-' + tab + ',\n' +
-			       '.tabmenu-item-' + tab + ',\n' +
-			       '#tabmenu a[href$="/honk/' + tab + '"]';
-		}).join(',\n') + ' { display: none !important; }';
-	}
+// The service changes the stored settings on its own when the dashboard is
+// switched, so re-read them before the page picks the menu it paints from.
+function refreshTabVisibility() {
+	uci.unload('honk');
+
+	return applyTabVisibility();
 }
 
-// Early synchronous check if UCI data is already loaded in memory
-try {
-	var _earlySections = uci.sections('honk', 'honk');
-	if (_earlySections && _earlySections.length) {
-		updateTabVisibilityFromSections(_earlySections);
-	}
-} catch (e) {}
+// Start right away: the theme's navigation may still be on its way.
+applyTabVisibility();
 
 function renderStatusHeader() {
 	var statusEl = E('span', { 'id': 'honk_status', 'style': 'font-weight: 500;' }, [
@@ -815,8 +942,6 @@ function renderStatusHeader() {
 
 	addElementPoll(pollStatusFn, statusEl, 5);
 
-	applyTabVisibility();
-
 	return section;
 }
 
@@ -824,6 +949,7 @@ preloadCodeMirror();
 
 return baseclass.extend({
 	applyTabVisibility: applyTabVisibility,
+	refreshTabVisibility: refreshTabVisibility,
 	callHonkStatus: callHonkStatus,
 	callHonkReload: callHonkReload,
 	callHonkRestart: callHonkRestart,
