@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=honk
-PKG_VERSION:=2026.11.03~88d470c
+PKG_VERSION:=2026.11.04~88d470c
 PKG_RELEASE:=1
 
 HONK_SRC_URL:=https://github.com/daeuniverse/honk.git
