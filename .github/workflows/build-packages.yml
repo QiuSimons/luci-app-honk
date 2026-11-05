@@ -187,7 +187,8 @@ jobs:
           CONTAINER: docker.io/openwrt/sdk
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
-          PACKAGES: honk luci-app-honk
+          # luci-app-honk is architecture-independent (all); compile only once per SDK under x86_64 to avoid duplicate artifact conflicts
+          PACKAGES: honk ${{ matrix.arch == 'x86_64' && 'luci-app-honk' || '' }}
           NO_REFRESH_CHECK: true
           NO_SHFMT_CHECK: true
 
@@ -202,8 +203,16 @@ jobs:
             ext="${base##*.}"
             name="${base%.*}"
             case "$name" in
-              luci-*) new_name="${name}-openwrt-${{ matrix.sdk }}.${ext}" ;;
-              *)      new_name="${name}-${{ matrix.arch }}-openwrt-${{ matrix.sdk }}.${ext}" ;;
+              luci-*)
+                new_name="${name}-openwrt-${{ matrix.sdk }}.${ext}"
+                ;;
+              *)
+                if [[ "$name" == *"${{ matrix.arch }}"* ]]; then
+                  new_name="${name}-openwrt-${{ matrix.sdk }}.${ext}"
+                else
+                  new_name="${name}-${{ matrix.arch }}-openwrt-${{ matrix.sdk }}.${ext}"
+                fi
+                ;;
             esac
             cp "$f" "dist/${new_name}"
           done < <(find bin/packages -type f \( -name '*.ipk' -o -name '*.apk' \) -print0)

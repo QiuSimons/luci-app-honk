@@ -44,7 +44,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add honk/Makefile luci-app-honk/root/etc/honk/doona
+          if git status --porcelain luci-app-honk | grep -q 'luci-app-honk'; then
+            current_rel=$(grep '^PKG_RELEASE:=' luci-app-honk/Makefile | head -n 1 | cut -d= -f2)
+            new_rel=$((current_rel + 1))
+            sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=${new_rel}/" luci-app-honk/Makefile
+          fi
+
+          git add honk/Makefile luci-app-honk
 
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
