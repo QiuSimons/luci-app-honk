@@ -90,7 +90,7 @@ start_service() {
     procd_set_param env \
         DAE_LOCATION_ASSET="/usr/share/v2ray" \
         MIMALLOC_ARENA_RESERVE="0" \
-        MALLOC_CONF="retain:false,narenas:2"
+        MALLOC_CONF="retain:false"
     procd_set_param command "$PROG" --config "$config_file"
     procd_set_param netdev "$HONK_HOST_IFACE" "$HONK_PEER_IFACE"
     procd_set_param limits core="unlimited"
