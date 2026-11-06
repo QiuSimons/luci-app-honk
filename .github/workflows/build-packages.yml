@@ -181,6 +181,19 @@ jobs:
           # selectable so the conditional vmlinux-btf dep stays inactive.
           sed -i '/depends on KERNEL_DEBUG_INFO_BTF/d' honk/Makefile
 
+      - name: Configure Fastly CDN and anti-stall timeouts for OpenWrt SDK
+        shell: bash
+        run: |
+          # openwrt/gh-action-sdk does not forward UPSTREAM_URL to docker run; inject mirror and wgetrc into entrypoint
+          f=$(find "${RUNNER_WORKSPACE}/../_actions/openwrt/gh-action-sdk" -name "entrypoint.sh" -print -quit 2>/dev/null)
+          if [ -n "$f" ] && [ -f "$f" ]; then
+            sed -i \
+              -e '2i export UPSTREAM_URL="https://downloads.openwrt.org"' \
+              -e '2i printf "connect_timeout = 15\\nread_timeout = 30\\ntries = 3\\nwaitretry = 2\\nretry_connrefused = on\\n" > ~/.wgetrc' \
+              "$f"
+            echo "Configured Fastly CDN and anti-stall wgetrc in $f"
+          fi
+
       - name: Build packages
         uses: openwrt/gh-action-sdk@main
         env:
