@@ -83,31 +83,35 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 ARCHIVE_FILE="$TMP_DIR/doona.tar.gz"
 echo "Downloading $DOWNLOAD_URL ..."
 
-if ! curl -fsSL --retry 3 --connect-timeout 15 -o "$ARCHIVE_FILE" "$DOWNLOAD_URL" 2>/dev/null || [ ! -s "$ARCHIVE_FILE" ]; then
-    # Try alternative format (switch between doona-v and doona-)
-    ALT_URL=""
-    if [ "$IS_LITE" -eq 1 ]; then
-        case "$DOWNLOAD_URL" in
-            *doona-lite-v*)
-                ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-lite-v/doona-lite-/')"
-                ;;
-            *doona-lite-[0-9]*)
-                ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-lite-/doona-lite-v/')"
-                ;;
-        esac
-    else
-        case "$DOWNLOAD_URL" in
-            *doona-v*)
-                ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-v/doona-/')"
-                ;;
-            *doona-[0-9]*)
-                ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-/doona-v/')"
-                ;;
-        esac
-    fi
-    if [ -n "$ALT_URL" ] && [ "$ALT_URL" != "$DOWNLOAD_URL" ]; then
-        echo "Retrying with alternative asset name format: $ALT_URL"
-        curl -fsSL --retry 3 --connect-timeout 15 -o "$ARCHIVE_FILE" "$ALT_URL"
+CURL_DOWN_OPTS=(-fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" --retry 5 --retry-delay 2 --connect-timeout 15)
+
+if ! curl "${CURL_DOWN_OPTS[@]}" -o "$ARCHIVE_FILE" "$DOWNLOAD_URL" || [ ! -s "$ARCHIVE_FILE" ]; then
+    # Try alternative format ONLY if the asset URL was inferred (not confirmed by upstream assets HTML)
+    if [ -z "$ASSET_PATH" ]; then
+        ALT_URL=""
+        if [ "$IS_LITE" -eq 1 ]; then
+            case "$DOWNLOAD_URL" in
+                *doona-lite-v*)
+                    ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-lite-v/doona-lite-/')"
+                    ;;
+                *doona-lite-[0-9]*)
+                    ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-lite-/doona-lite-v/')"
+                    ;;
+            esac
+        else
+            case "$DOWNLOAD_URL" in
+                *doona-v*)
+                    ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-v/doona-/')"
+                    ;;
+                *doona-[0-9]*)
+                    ALT_URL="$(echo "$DOWNLOAD_URL" | sed 's/doona-/doona-v/')"
+                    ;;
+            esac
+        fi
+        if [ -n "$ALT_URL" ] && [ "$ALT_URL" != "$DOWNLOAD_URL" ]; then
+            echo "Retrying with alternative inferred asset name format: $ALT_URL"
+            curl "${CURL_DOWN_OPTS[@]}" -o "$ARCHIVE_FILE" "$ALT_URL" || true
+        fi
     fi
 fi
 
