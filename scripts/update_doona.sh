@@ -36,20 +36,23 @@ esac
 echo "==> Updating embedded Doona dashboard..."
 echo "Target directory: $TARGET_DIR"
 
-# Fetch latest release tag
-RELEASES_HTML="$(curl -fsSL --retry 3 --connect-timeout 10 "https://github.com/${UPSTREAM_REPO}/releases" 2>/dev/null || true)"
-LATEST_TAG="$(printf "%s" "$RELEASES_HTML" | grep -o 'releases/tag/[^"/]*' | head -n 1 | sed 's|releases/tag/||')"
+# Fetch latest release tag (no GitHub REST API)
+LATEST_TAG=""
+RELEASES_HTML="$(curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" --retry 3 --connect-timeout 10 "https://github.com/${UPSTREAM_REPO}/releases" 2>/dev/null || true)"
+if [ -n "$RELEASES_HTML" ]; then
+    LATEST_TAG="$(printf "%s" "$RELEASES_HTML" | grep -o 'releases/tag/[^"/]*' | head -n 1 | sed 's|releases/tag/||' || true)"
+fi
 
 if [ -z "$LATEST_TAG" ]; then
     echo "Warning: Could not detect latest tag from GitHub releases HTML. Trying git ls-remote..."
-    LATEST_TAG="$(git ls-remote --tags "https://github.com/${UPSTREAM_REPO}.git" | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}' | sort -V | tail -n 1)"
+    LATEST_TAG="$(git ls-remote --tags "https://github.com/${UPSTREAM_REPO}.git" 2>/dev/null | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}' | sort -V | tail -n 1 || true)"
 fi
 
 [ -n "$LATEST_TAG" ] || { echo "Error: Failed to resolve latest release tag for ${UPSTREAM_REPO}" >&2; exit 1; }
 echo "Latest release tag: $LATEST_TAG"
 
 # Resolve asset download URL
-ASSETS_HTML="$(curl -fsSL --retry 3 --connect-timeout 10 "https://github.com/${UPSTREAM_REPO}/releases/expanded_assets/${LATEST_TAG}" 2>/dev/null || true)"
+ASSETS_HTML="$(curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" --retry 3 --connect-timeout 10 "https://github.com/${UPSTREAM_REPO}/releases/expanded_assets/${LATEST_TAG}" 2>/dev/null || true)"
 TAG_NO_V="${LATEST_TAG#[vV]}"
 DOWNLOAD_URL=""
 
