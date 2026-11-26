@@ -15,7 +15,7 @@ OpenWrt 上的 honk（eBPF 透明代理，兼容 dae）LuCI 界面与安装包�
 
 ### 宿主机依赖
 
-构建 `honk-core` 需要 Rust、Zig 和 bpf-linker。以下命令以 Ubuntu/Debian x86_64 为例：
+构建 `honk-core` 需要 Rust、Zig、bpf-linker 和 `cargo-zigbuild`。以下命令以 Ubuntu/Debian x86_64 为例：
 
 ```bash
 sudo apt-get update
@@ -24,6 +24,8 @@ sudo apt-get install -y clang llvm libbpf-dev cmake libclang-dev zstd \
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path
 . "$HOME/.cargo/env"
+
+cargo install --locked cargo-zigbuild
 
 # 从 honk/Makefile 的 pin 解析版本
 eval "$(./honk/honk_toolchain.sh)"
@@ -40,6 +42,8 @@ sudo ln -sf "/usr/local/zig-x86_64-linux-${ZIG_VERSION}/zig" /usr/local/bin/zig
 ```
 
 Zig 的下载包按宿主机架构选择，上面是 x86_64。`rustup` 用 `-y` 免交互；`sudo` 没有 NOPASSWD 时需要密码。
+
+`honk/zig-version` 是 Zig 版本 pin，交叉编译由 `cargo-zigbuild` 驱动，脚本缺少它时会自动安装。
 
 ### 编译 honk-core
 
