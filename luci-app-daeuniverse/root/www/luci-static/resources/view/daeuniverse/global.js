@@ -40,17 +40,20 @@ return view.extend({
 		s.anonymous = true;
 		s.addremove = false;
 
-		o = s.option(form.Flag, 'enabled', _('Enabled'));
+		var installedVers = [];
+		if (versions.honk) installedVers.push('honk ' + versions.honk);
+		if (versions.dae) installedVers.push('dae ' + versions.dae);
+		var enabledDesc = installedVers.length
+			? _('Installed versions:') + ' ' + installedVers.join(' \u00b7 ')
+			: null;
+
+		o = s.option(form.Flag, 'enabled', _('Enabled'), enabledDesc);
 		o.rmempty = false;
 
-		var coreDescParts = [];
-		if (versions.honk) coreDescParts.push('honk: ' + versions.honk);
-		if (versions.dae) coreDescParts.push('dae: ' + versions.dae);
-		var coreDesc = _('Select the proxy engine core. Each core uses its own native configuration directory under /etc/daeuniverse/.') +
-			(coreDescParts.length ? (' (' + coreDescParts.join(' | ') + ')') : '');
+		var coreDesc = _('Select the proxy engine core. Each core uses its own native configuration directory under /etc/daeuniverse/.');
 
 		o = s.option(form.ListValue, 'core', _('Core Engine'), coreDesc);
-		o.value('honk', installed.honk !== false ? _('honk (Default)') : _('honk (Not installed)'));
+		o.value('honk', installed.honk !== false ? _('honk') : _('honk (Not installed)'));
 		o.value('dae', installed.dae !== false ? _('dae') : _('dae (Not installed)'));
 		o.default = 'honk';
 		o.rmempty = false;
@@ -144,23 +147,32 @@ return view.extend({
 
 				return dashStep.then(function() {
 					self._editorDirty = false;
-					var pending = uci.changes();
-					var hasUciChanges = pending && Object.keys(pending).length > 0;
-					if (hasUciChanges) {
-						return ui.changes.apply(mode == '0');
-					}
-					if (editorDirty && newEnabled === '1') {
-						return daeu.callValidateConfig(newCore).then(function(vres) {
+
+					var applyChecks = (editorDirty && newEnabled === '1')
+						? daeu.callValidateConfig(newCore).then(function(vres) {
 							if (vres && vres.valid === false)
 								throw new Error(daeu.msgText(vres, _('Configuration validation failed')));
 							return daeu.callReload();
 						}).then(function(r) {
 							if (!r || r.success === false)
 								throw new Error(daeu.msgText(r, _('Service did not accept the request')));
-							daeu.showNotification(null, E('p', _('Configuration applied and service reloaded.')), 'info');
-						});
-					}
-					daeu.showNotification(null, E('p', _('Configuration saved.')), 'info');
+						})
+						: Promise.resolve();
+
+					return applyChecks.then(function() {
+						/*
+						 * uci.changes() is an RPC in this LuCI release, so it
+						 * returns a Promise: probing it with Object.keys() always
+						 * looked empty and skipped the commit, which left every
+						 * save staged but never applied while the page still
+						 * reported success. Commit unconditionally instead, the
+						 * way the stock handleSaveApply does.
+						 */
+						if (ui.changes && typeof ui.changes.apply === 'function')
+							return ui.changes.apply(mode == '0');
+
+						return null;
+					});
 				});
 			});
 		}).catch(function(err) {

@@ -200,8 +200,13 @@ function get_core_version(core) {
 	let p = popen(bin + " --version 2>/dev/null");
 	let out = p ? p.read("all") : "";
 	if (p) p.close();
-	let first = split(trim(out || ""), /[\r\n]+/)[0];
-	return first ? trim(first) : "";
+	let first = trim(split(trim(out || ""), /[\r\n]+/)[0] || "");
+	if (!first) return "";
+	/* `--version` prints "<tool> [version] <ver>" with each tool wording it
+	   its own way ("honk-core 467cfa7" vs "dae version 2026.11.27~57f67ba").
+	   Keep only the trailing token so callers get a bare version. */
+	let parts = split(first, /[ \t]+/);
+	return parts[length(parts) - 1];
 }
 
 function check_dae_managed_layout(config_file) {
