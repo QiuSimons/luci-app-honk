@@ -13,7 +13,8 @@ on:
       - master
     paths:
       - 'honk/**'
-      - 'luci-app-honk/**'
+      - 'dae/**'
+      - 'luci-app-daeuniverse/**'
       - 'scripts/**'
       - '.github/workflows/build-packages.yml'
 
@@ -29,7 +30,6 @@ jobs:
     name: Prepare version and matrix
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.meta.outputs.version }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_name: ${{ steps.meta.outputs.release_name }}
       sdks: ${{ steps.matrix.outputs.sdks }}
@@ -41,19 +41,18 @@ jobs:
         id: meta
         shell: bash
         run: |
-          pkg_version=$(grep '^PKG_VERSION:=' honk/Makefile | head -n 1 | cut -d= -f2)
-          pkg_release=$(grep '^PKG_RELEASE:=' honk/Makefile | head -n 1 | cut -d= -f2)
+          honk_version=$(grep '^PKG_VERSION:=' honk/Makefile | head -n 1 | cut -d= -f2)
+          dae_version=$(grep '^PKG_VERSION:=' dae/Makefile | head -n 1 | cut -d= -f2)
+          luci_version=$(grep '^PKG_VERSION:=' luci-app-daeuniverse/Makefile | head -n 1 | cut -d= -f2)
+          luci_release=$(grep '^PKG_RELEASE:=' luci-app-daeuniverse/Makefile | head -n 1 | cut -d= -f2)
 
-          version="${pkg_version}-r${pkg_release}"
-          # git ref 不允许 '~'（PKG_VERSION 的 Debian 风格分隔符），只在 tag 里替换
-          release_tag="honk_$(printf '%s' "$version" | tr '~' '_')"
-          release_name="honk_${version}"
+          tag_ver="${luci_version}-r${luci_release}_honk_${honk_version}_dae_${dae_version}"
+          # git tag 不允许 '~'
+          release_tag="daeuniverse_$(printf '%s' "$tag_ver" | tr '~' '_')"
+          release_name="daeuniverse ${luci_version}-r${luci_release} (honk ${honk_version} | dae ${dae_version})"
 
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
           echo "release_name=${release_name}" >> "$GITHUB_OUTPUT"
-
-          echo "Version: ${version}"
           echo "Release tag: ${release_tag}"
 
       - name: Resolve latest SDK releases
@@ -94,7 +93,7 @@ jobs:
 
           echo "sdks=$(jq -nc --args '$ARGS.positional' -- "${sdks[@]}")" >> "$GITHUB_OUTPUT"
 
-  prebuild:
+  prebuild-honk:
     name: Prebuild honk-core ${{ matrix.arch }}
     runs-on: ubuntu-latest
     needs: prepare
@@ -150,12 +149,55 @@ jobs:
           retention-days: 1
           compression-level: 0
 
+  prebuild-dae:
+    name: Prebuild dae ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - aarch64_generic
+          - x86_64
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+          cache: false
+
+      - name: Install host eBPF tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang llvm file
+
+      - name: Build dae binary
+        shell: bash
+        run: |
+          ./dae/build_dae_core.sh "${{ matrix.arch }}" dae/files/dae.bin
+
+      - name: Upload dae binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: dae-core-${{ matrix.arch }}
+          path: dae/files/dae.bin
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
   build:
     name: Build ${{ matrix.arch }}-openwrt-${{ matrix.sdk }}
     runs-on: ubuntu-latest
     needs:
       - prepare
-      - prebuild
+      - prebuild-honk
+      - prebuild-dae
     strategy:
       fail-fast: false
       matrix:
@@ -174,17 +216,20 @@ jobs:
           name: honk-core-${{ matrix.arch }}
           path: honk/files
 
+      - name: Download dae binary
+        uses: actions/download-artifact@v8
+        with:
+          name: dae-core-${{ matrix.arch }}
+          path: dae/files
+
       - name: Remove KERNEL_DEBUG_INFO_BTF dependency for CI
         shell: bash
         run: |
-          # No KERNEL_DEBUG_INFO_BTF in the SDK: make the kernel-BTF choice
-          # selectable so the conditional vmlinux-btf dep stays inactive.
-          sed -i '/depends on KERNEL_DEBUG_INFO_BTF/d' honk/Makefile
+          sed -i '/depends on KERNEL_DEBUG_INFO_BTF/d' honk/Makefile dae/Makefile
 
       - name: Configure Fastly CDN and anti-stall timeouts for OpenWrt SDK
         shell: bash
         run: |
-          # openwrt/gh-action-sdk does not forward UPSTREAM_URL to docker run; inject mirror and wgetrc into entrypoint
           f=$(find "${RUNNER_WORKSPACE}/../_actions/openwrt/gh-action-sdk" -name "entrypoint.sh" -print -quit 2>/dev/null)
           if [ -n "$f" ] && [ -f "$f" ]; then
             sed -i \
@@ -200,8 +245,7 @@ jobs:
           CONTAINER: docker.io/openwrt/sdk
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
-          # luci-app-honk is architecture-independent (all); compile only once per SDK under x86_64 to avoid duplicate artifact conflicts
-          PACKAGES: honk ${{ matrix.arch == 'x86_64' && 'luci-app-honk' || '' }}
+          PACKAGES: honk dae ${{ matrix.arch == 'x86_64' && 'luci-app-daeuniverse' || '' }}
           NO_REFRESH_CHECK: true
           NO_SHFMT_CHECK: true
 
@@ -212,7 +256,10 @@ jobs:
           mkdir -p dist
           while IFS= read -r -d '' f; do
             base="$(basename "$f")"
-            case "$base" in *honk*) ;; *) continue ;; esac
+            case "$base" in
+              honk[_-]*|dae[_-]*|luci-app-daeuniverse*|luci-i18n-daeuniverse*) ;;
+              *) continue ;;
+            esac
             ext="${base##*.}"
             name="${base%.*}"
             case "$name" in
