@@ -29,8 +29,19 @@ endef
 
 define Package/luci-app-daeuniverse/conffiles
 /etc/config/daeuniverse
-/etc/daeuniverse/honk/
-/etc/daeuniverse/dae/
+/etc/daeuniverse/honk/config.dae
+/etc/daeuniverse/honk/config.d/api.dae
+/etc/daeuniverse/honk/config.d/dns.dae
+/etc/daeuniverse/honk/config.d/node.dae
+/etc/daeuniverse/honk/config.d/route.dae
+/etc/daeuniverse/dae/config.dae
+/etc/daeuniverse/dae/api.dae
+/etc/daeuniverse/dae/config.d/global.dae
+/etc/daeuniverse/dae/config.d/dns.dae
+/etc/daeuniverse/dae/config.d/node.dae
+/etc/daeuniverse/dae/config.d/subscription.dae
+/etc/daeuniverse/dae/config.d/group.dae
+/etc/daeuniverse/dae/config.d/routing.dae
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
