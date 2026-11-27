@@ -126,11 +126,11 @@ return view.extend({
 				if (!res || res.success === false) {
 					uci.set('daeuniverse', sid, 'core', oldCore);
 					return uci.save().then(function() {
-						throw new Error((res && res.message) || _('Failed to prepare target core'));
+						throw new Error(daeu.msgText(res, _('Failed to prepare target core')));
 					});
 				}
 				if (res.warning) {
-					daeu.showNotification(null, E('p', res.warning), 'warning', 6000);
+					daeu.showNotification(null, E('p', daeu.msgText(res.warning)), 'warning', 6000);
 				}
 			}) : Promise.resolve();
 
@@ -152,11 +152,11 @@ return view.extend({
 					if (editorDirty && newEnabled === '1') {
 						return daeu.callValidateConfig(newCore).then(function(vres) {
 							if (vres && vres.valid === false)
-								throw new Error(vres.message || _('Configuration validation failed'));
+								throw new Error(daeu.msgText(vres, _('Configuration validation failed')));
 							return daeu.callReload();
 						}).then(function(r) {
 							if (!r || r.success === false)
-								throw new Error((r && r.message) || _('Service did not accept the request'));
+								throw new Error(daeu.msgText(r, _('Service did not accept the request')));
 							daeu.showNotification(null, E('p', _('Configuration applied and service reloaded.')), 'info');
 						});
 					}

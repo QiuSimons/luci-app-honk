@@ -461,3 +461,57 @@ msgstr "退出全屏"
 
 msgid "Click to switch scale (85% / 100% / 75%)"
 msgstr "点击切换缩放比例（85% / 100% / 75%）"
+
+msgid "/usr/bin/dae is not installed"
+msgstr "/usr/bin/dae 未安装"
+
+msgid "dae configuration validation failed"
+msgstr "dae 配置校验失败"
+
+msgid "Invalid core"
+msgstr "无效的核心"
+
+msgid "Selected core is not installed"
+msgstr "所选核心未安装"
+
+msgid "Entry file should only contain include { config.d/*.dae api.dae } for kdae managed editing."
+msgstr "入口文件应只包含 include { config.d/*.dae api.dae }，否则 kdae 无法托管编辑。"
+
+msgid "Failed to dispatch hot reload"
+msgstr "派发热重载失败"
+
+msgid "Failed to dispatch restart"
+msgstr "派发重启失败"
+
+msgid "Invalid URL"
+msgstr "无效的 URL"
+
+msgid "Refusing to deploy to an unsafe target directory"
+msgstr "拒绝部署到不安全的目标目录"
+
+msgid "Download script not found"
+msgstr "未找到下载脚本"
+
+msgid "Failed to dispatch the download task"
+msgstr "派发下载任务失败"
+
+msgid "Invalid dashboard type"
+msgstr "无效的面板类型"
+
+msgid "dae core requires a non-empty api.secret when config_write is enabled."
+msgstr "启用 config_write 时，dae 核心要求 api.secret 不能为空。"
+
+msgid "dae api.listen must be a numeric IP:port (for example 0.0.0.0:9527)."
+msgstr "dae 的 api.listen 必须是数字形式的 IP:端口（例如 0.0.0.0:9527）。"
+
+msgid "dae api.secret must be visible ASCII without whitespace or commas."
+msgstr "dae 的 api.secret 必须是可见 ASCII 字符，且不含空白或逗号。"
+
+msgid "dae api requires api.secret unless allow_anonymous_loopback is enabled on loopback."
+msgstr "dae 的 api 需要 api.secret，除非在回环地址上启用了 allow_anonymous_loopback。"
+
+msgid "dae non-loopback listener requires api.secret."
+msgstr "dae 监听非回环地址时必须设置 api.secret。"
+
+msgid "native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527)."
+msgstr "native_api.listen 必须是数字形式的 IP:端口（例如 0.0.0.0:9527）。"

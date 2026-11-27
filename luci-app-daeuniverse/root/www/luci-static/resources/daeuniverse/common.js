@@ -202,10 +202,62 @@ function waitForServiceState(wantRunning, attempts) {
 	});
 }
 
+/*
+ * Backend failures carry a stable `code` next to the English `message`.
+ * Translate the known codes here so the UI follows the selected locale, and
+ * fall back to the raw message (which is what older backends send).
+ */
+function msgText(res, fallback) {
+	var d = (res && res.detail) ? String(res.detail) : '';
+
+	if (res && res.code) {
+		switch (res.code) {
+		case 'dae_not_installed':
+			return _('/usr/bin/dae is not installed');
+		case 'dae_validate_failed':
+			return _('dae configuration validation failed') + (d ? ': ' + d : '');
+		case 'invalid_core':
+			return _('Invalid core') + (d ? ': ' + d : '');
+		case 'core_not_installed':
+			return _('Selected core is not installed') + (d ? ': ' + d : '');
+		case 'layout_unmanaged':
+			return _('Entry file should only contain include { config.d/*.dae api.dae } for kdae managed editing.') + (d ? ' (' + d + ')' : '');
+		case 'reload_failed':
+			return _('Failed to dispatch hot reload');
+		case 'restart_failed':
+			return _('Failed to dispatch restart');
+		case 'invalid_url':
+			return _('Invalid URL');
+		case 'unsafe_target':
+			return _('Refusing to deploy to an unsafe target directory');
+		case 'script_missing':
+			return _('Download script not found') + (d ? ': ' + d : '');
+		case 'download_failed':
+			return _('Failed to dispatch the download task');
+		case 'invalid_dashboard_type':
+			return _('Invalid dashboard type');
+		case 'secret_required':
+			return _('dae core requires a non-empty api.secret when config_write is enabled.');
+		case 'listen_not_numeric':
+			return _('dae api.listen must be a numeric IP:port (for example 0.0.0.0:9527).');
+		case 'secret_not_ascii':
+			return _('dae api.secret must be visible ASCII without whitespace or commas.');
+		case 'secret_required_loopback':
+			return _('dae api requires api.secret unless allow_anonymous_loopback is enabled on loopback.');
+		case 'secret_required_nonloopback':
+			return _('dae non-loopback listener requires api.secret.');
+		case 'native_listen_not_numeric':
+			return _('native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527).');
+		}
+	}
+
+	return (res && res.message) || fallback;
+}
+
 function switchDashboardAndWait(type) {
 	return callSwitchDashboardApi(type).then(function(resp) {
 		if (!resp || resp.success === false)
-			throw new Error((resp && resp.message) || _('Service did not accept the request'));
+			throw new Error(msgText(resp, _('Service did not accept the request')));
 
 		if (resp.pending_download)
 			return { pending: true };
@@ -263,7 +315,7 @@ function triggerDashboardDownload(url, type, logBox, progressWrap, onFinish) {
 
 	callDownloadDashboard(url, type).then(function(resp) {
 		if (!resp || resp.success === false) {
-			fail(_('Failed to trigger download:') + ' ' + (resp ? resp.message : _('Unknown error')));
+			fail(_('Failed to trigger download:') + ' ' + (resp ? msgText(resp, _('Unknown error')) : _('Unknown error')));
 			return;
 		}
 
@@ -782,15 +834,15 @@ function createConfigFileView(filesOrPath, mapTitle, mapDesc, fieldTitle, succes
 
 				return callValidateConfig(core).then(function(vres) {
 					if (vres && vres.valid === false)
-						throw new Error(vres.message || _('Configuration validation failed'));
+						throw new Error(msgText(vres, _('Configuration validation failed')));
 
 					if (vres && vres.warning)
-						showNotification(null, E('p', vres.warning), 'warning', 6000);
+						showNotification(null, E('p', msgText(vres.warning)), 'warning', 6000);
 
 					var call = needRestart ? callRestart : callReload;
 					return call().then(function(resp) {
 						if (!resp || resp.success === false)
-							throw new Error((resp && resp.message) || _('Service did not accept the request'));
+							throw new Error(msgText(resp, _('Service did not accept the request')));
 
 						return needRestart ? waitForServiceState(true) : callStatus().then(function(st) {
 							updateStatus(st);
@@ -1047,6 +1099,7 @@ return baseclass.extend({
 	getConfiguredCore: getConfiguredCore,
 	coreLabel: coreLabel,
 	showNotification: showNotification,
+	msgText: msgText,
 	updateStatus: updateStatus,
 	addElementPoll: addElementPoll
 });

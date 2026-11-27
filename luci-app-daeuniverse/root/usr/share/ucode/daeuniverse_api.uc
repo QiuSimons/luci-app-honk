@@ -284,30 +284,30 @@ export function validate_api_for_core(core, cfg) {
 	if (!cfg) return { ok: true };
 	if (core == "dae") {
 		if (cfg.config_write && (!cfg.secret || cfg.secret == "")) {
-			return { ok: false, message: "dae core requires a non-empty api.secret when config_write is enabled." };
+			return { ok: false, code: "secret_required", message: "dae core requires a non-empty api.secret when config_write is enabled." };
 		}
 		if (cfg.enabled) {
 			let hp = parse_host_port(cfg.listen);
 			if (!is_numeric_ip(hp.host) || !is_valid_port_num(hp.port)) {
-				return { ok: false, message: "dae api.listen must be a numeric IP:port (for example 0.0.0.0:9527)." };
+				return { ok: false, code: "listen_not_numeric", message: "dae api.listen must be a numeric IP:port (for example 0.0.0.0:9527)." };
 			}
 			if (cfg.secret && cfg.secret != "") {
 				if (!is_valid_api_secret(cfg.secret)) {
-					return { ok: false, message: "dae api.secret must be visible ASCII without whitespace or commas." };
+					return { ok: false, code: "secret_not_ascii", message: "dae api.secret must be visible ASCII without whitespace or commas." };
 				}
 			} else {
 				if (!cfg.allow_anonymous_loopback) {
-					return { ok: false, message: "dae api requires api.secret unless allow_anonymous_loopback is enabled on loopback." };
+					return { ok: false, code: "secret_required_loopback", message: "dae api requires api.secret unless allow_anonymous_loopback is enabled on loopback." };
 				}
 				if (!is_loopback_ip(hp.host)) {
-					return { ok: false, message: "dae non-loopback listener requires api.secret." };
+					return { ok: false, code: "secret_required_nonloopback", message: "dae non-loopback listener requires api.secret." };
 				}
 			}
 		}
 	} else if (cfg.enabled) {
 		let hp = parse_host_port(cfg.listen);
 		if (!is_numeric_ip(hp.host) || !is_valid_port_num(hp.port)) {
-			return { ok: false, message: "native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527)." };
+			return { ok: false, code: "native_listen_not_numeric", message: "native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527)." };
 		}
 	}
 	return { ok: true };

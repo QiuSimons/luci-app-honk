@@ -216,21 +216,21 @@ function check_dae_managed_layout(config_file) {
 	let stripped = replace(flat, /include *\{[^}]*\}/g, "");
 	let extra_text = trim(stripped);
 	if (!has_wildcard || !has_api || extra_text != "") {
-		return "Entry file (" + config_file + ") should only contain include { config.d/*.dae api.dae } for kdae managed editing.";
+		return { code: "layout_unmanaged", detail: config_file };
 	}
 	return null;
 }
 
 function run_dae_validate(config_file) {
 	if (!is_executable(CORE_BINS.dae))
-		return { ok: false, message: "/usr/bin/dae is not installed" };
+		return { ok: false, code: "dae_not_installed", message: "/usr/bin/dae is not installed" };
 	let safe_cfg = replace(config_file, "'", "'\\''");
 	let cmd = sprintf("DAE_LOCATION_ASSET='/usr/share/v2ray' '%s' validate -c '%s' 2>&1", CORE_BINS.dae, safe_cfg);
 	let p = popen(cmd);
 	let out = p ? p.read("all") : "";
 	let rc = p ? p.close() : -1;
 	if (rc != 0) {
-		return { ok: false, message: trim(out || "dae config validation failed") };
+		return { ok: false, code: "dae_validate_failed", message: trim(out || "dae config validation failed") };
 	}
 	return { ok: true };
 }
@@ -251,11 +251,11 @@ function prepare_core_switch(target_core) {
 	cached_proc = { pid: null, core: null };
 
 	if (target_core != "honk" && target_core != "dae")
-		return { success: false, message: "Invalid core: " + target_core };
+		return { success: false, code: "invalid_core", detail: target_core, message: "Invalid core: " + target_core };
 
 	let installed = get_installed_cores();
 	if (!installed[target_core])
-		return { success: false, message: "Selected core is not installed: " + CORE_BINS[target_core] };
+		return { success: false, code: "core_not_installed", detail: CORE_BINS[target_core], message: "Selected core is not installed: " + CORE_BINS[target_core] };
 
 	let api_cfg = get_api_config(target_core);
 	let config_file = get_core_config_file(target_core);
@@ -263,14 +263,14 @@ function prepare_core_switch(target_core) {
 	if (api_cfg.parsed.format) {
 		let check = validate_api_for_core(target_core, api_cfg.parsed);
 		if (!check.ok)
-			return { success: false, message: check.message };
+			return { success: false, code: check.code, message: check.message };
 	}
 
 	let warning = null;
 	if (target_core == "dae") {
 		let v = run_dae_validate(config_file);
 		if (!v.ok)
-			return { success: false, message: "dae configuration validation failed:\n" + v.message };
+			return { success: false, code: "dae_validate_failed", detail: v.message, message: "dae configuration validation failed:\n" + v.message };
 		warning = check_dae_managed_layout(config_file);
 	}
 
@@ -351,7 +351,7 @@ function download_dashboard(req) {
 
 	let url = (req && req.args && req.args.url) ? req.args.url : "";
 	if (!match(url, /^https?:\/\//) || match(url, /[ \t\r\n'"`]/)) {
-		return { success: false, message: "Invalid URL" };
+		return { success: false, code: "invalid_url", message: "Invalid URL" };
 	}
 
 	let configured_core = get_uci_core();
@@ -364,11 +364,11 @@ function download_dashboard(req) {
 	}
 
 	if (!is_safe_ui_dir(target_dir))
-		return { success: false, message: "Refusing to deploy to an unsafe target directory" };
+		return { success: false, code: "unsafe_target", message: "Refusing to deploy to an unsafe target directory" };
 
 	let s = stat(DL_SCRIPT);
 	if (!s) {
-		return { success: false, message: "Script not found: " + DL_SCRIPT };
+		return { success: false, code: "script_missing", detail: DL_SCRIPT, message: "Script not found: " + DL_SCRIPT };
 	}
 
 	let safe_script = replace(DL_SCRIPT, "'", "'\\''");
@@ -379,7 +379,7 @@ function download_dashboard(req) {
 	let cmd = sprintf("/bin/sh '%s' '%s' '%s' '%s' >/dev/null 2>&1 &", safe_script, safe_target, safe_url, safe_type);
 	let rc = system(cmd);
 	if (rc != 0)
-		return { success: false, message: "failed to dispatch the download task" };
+		return { success: false, code: "download_failed", message: "failed to dispatch the download task" };
 
 	return { success: true, target_dir: target_dir, url: url, queued: true };
 }
@@ -423,7 +423,7 @@ function switch_dashboard_api(target_type) {
 
 	target_type = normalize_dashboard_type(target_type);
 	if (!is_valid_dashboard_type(target_type))
-		return { success: false, message: "Invalid dashboard type" };
+		return { success: false, code: "invalid_dashboard_type", message: "Invalid dashboard type" };
 
 	let active_core = get_uci_core();
 	let other_core = (active_core == "dae") ? "honk" : "dae";
@@ -537,14 +537,14 @@ return {
 				let api_cfg = get_api_config(c);
 				let check = validate_api_for_core(c, api_cfg.parsed);
 				if (!check.ok)
-					return { valid: false, message: check.message };
+					return { valid: false, code: check.code, message: check.message };
 
 				if (c == "dae") {
 					let config_file = get_core_config_file("dae");
 					let layout_warn = check_dae_managed_layout(config_file);
 					let v = run_dae_validate(config_file);
 					if (!v.ok)
-						return { valid: false, message: v.message, warning: layout_warn };
+						return { valid: false, code: "dae_validate_failed", detail: v.message, message: v.message, warning: layout_warn };
 					return { valid: true, warning: layout_warn };
 				}
 				return { valid: true };
@@ -557,7 +557,7 @@ return {
 
 				let rc = system("/etc/init.d/daeuniverse hot_reload >/dev/null 2>&1 &");
 				if (rc != 0)
-					return { success: false, message: "failed to dispatch hot_reload" };
+					return { success: false, code: "reload_failed", message: "failed to dispatch hot_reload" };
 
 				return { success: true, queued: true };
 			}
@@ -569,7 +569,7 @@ return {
 
 				let rc = system("/etc/init.d/daeuniverse restart >/dev/null 2>&1 &");
 				if (rc != 0)
-					return { success: false, message: "failed to dispatch restart" };
+					return { success: false, code: "restart_failed", message: "failed to dispatch restart" };
 
 				return { success: true, queued: true };
 			}
