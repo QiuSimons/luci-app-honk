@@ -95,10 +95,16 @@ return view.extend({
 		o.rows = 25;
 		o.wrap = 'off';
 		o.load = function() {
-			return daeu.readFile(globalFilePath);
+			return daeu.readFile(globalFilePath).then(function(content) {
+				o._loadedContent = content || '';
+				return o._loadedContent;
+			});
 		};
 		o.write = function(section_id, formvalue) {
 			if (!this.isActive(section_id) || formvalue == null) return;
+			/* Never write back the text this page loaded: a tab opened before
+			   the file changed elsewhere would otherwise restore stale content. */
+			if (formvalue === o._loadedContent) return;
 			return daeu.writeFile(globalFilePath, formvalue);
 		};
 

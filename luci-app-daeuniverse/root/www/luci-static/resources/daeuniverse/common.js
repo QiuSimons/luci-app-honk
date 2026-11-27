@@ -814,10 +814,17 @@ function createConfigFileView(filesOrPath, mapTitle, mapDesc, fieldTitle, succes
 				o.wrap = 'off';
 				o.load = function() {
 					return readFile(entry.path).then(function(content) {
-						return content || '';
+						o._loadedContent = content || '';
+						return o._loadedContent;
 					});
 				};
 				o.write = function(section_id, formvalue) {
+					/*
+					 * Writing back exactly what this page loaded would clobber
+					 * edits made elsewhere, or a config replaced while the tab
+					 * stayed open, so skip the write unless the text changed.
+					 */
+					if (formvalue == null || formvalue === o._loadedContent) return;
 					return writeFile(entry.path, formvalue);
 				};
 			});
