@@ -12,7 +12,7 @@ global {
     sniffing_timeout: 300ms
     allow_insecure: false
     bootstrap_resolver: '223.5.5.5:53'
-    tcp_check_url: 'https://www.gstatic.com/generate_204'
+    tcp_check_url: 'https://cp.cloudflare.com/generate_204'
     tcp_check_http_method: HEAD
     udp_check_dns: 'dns.google.com:53', '8.8.8.8', '2001:4860:4860::8888'
 }
