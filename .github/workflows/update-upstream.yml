@@ -1,0 +1,79 @@
+name: Update upstream cores and dashboard
+
+on:
+  schedule:
+    - cron: '17 0 * * *'
+  workflow_dispatch:
+    inputs:
+      aggressive:
+        description: 'Aggressive mode (use Glassyiris/honk test releases)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  update:
+    name: Update honk, dae, and doona
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Update honk version
+        env:
+          INPUT_AGGRESSIVE: ${{ github.event.inputs.aggressive }}
+        run: |
+          if [ "$INPUT_AGGRESSIVE" = "true" ]; then
+            UPSTREAM_REPO=Glassyiris/honk bash scripts/update_honk_version.sh
+          else
+            bash scripts/update_honk_version.sh
+          fi
+
+      - name: Update dae (kdae) version
+        run: bash scripts/update_dae_version.sh
+
+      - name: Update doona dashboard
+        run: bash scripts/update_doona.sh
+
+      - name: Commit changes
+        id: commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git status --porcelain luci-app-daeuniverse | grep -q 'luci-app-daeuniverse'; then
+            current_rel=$(grep '^PKG_RELEASE:=' luci-app-daeuniverse/Makefile | head -n 1 | cut -d= -f2)
+            new_rel=$((current_rel + 1))
+            sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=${new_rel}/" luci-app-daeuniverse/Makefile
+          fi
+
+          git add honk/Makefile dae/Makefile dae/pprof/default.pgo luci-app-daeuniverse
+
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No version change."
+          else
+            HONK_VER="$(grep '^PKG_VERSION:=' honk/Makefile | cut -d= -f2 || true)"
+            DAE_VER="$(grep '^PKG_VERSION:=' dae/Makefile | cut -d= -f2 || true)"
+            git commit -m "auto: update honk (${HONK_VER}), dae (${DAE_VER}) and doona dashboard"
+
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push changes
+        if: steps.commit.outputs.changed == 'true'
+        shell: bash
+        run: git push origin master
+
+      - name: Trigger build packages
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "Build packages" --ref master

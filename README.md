@@ -1,94 +1,92 @@
-# luci-app-honk
+# luci-app-daeuniverse
 
-OpenWrt 上的 honk（eBPF 透明代理，兼容 dae）LuCI 界面与安装包。
+OpenWrt 上的双核心透明代理 LuCI 插件与软件包套件，一套界面、一套共享 Web 面板，统一管理与切换 **honk**（`honk-core`，默认）和 **dae**（`olicesx/dae` `kdae` 分支）两大 eBPF 核心。
 
 ## 软件包
 
 | 包 | 内容 |
 | --- | --- |
-| `luci-app-honk` | LuCI 页面、rpcd 服务、Doona 静态资源 |
-| `honk` | 从 daeuniverse/honk 指定 commit 编译的 `honk-core`，以及 init.d 脚本和默认配置 |
+| `luci-app-daeuniverse` | 统一 LuCI 页面、`/etc/init.d/daeuniverse` 服务脚本、`98-daeuniverse` 热插拔、RPCD 服务、`honk`/`dae` 默认配置与共享 Doona 面板静态资源（提供 `DAEU_WITH_HONK` / `DAEU_WITH_DAE` 条件依赖，默认全部启用） |
+| `honk` | 从 `daeuniverse/honk` `main` 最新提交编译的 `/usr/bin/honk-core` |
+| `dae` | 从 `olicesx/dae` `kdae` 最新提交编译的 `/usr/bin/dae` |
 
-`honk-core` 目前支持 x86_64 和 aarch64_generic，构建脚本在 `honk/` 内。
+目前支持 **`x86_64`** 与 **`aarch64_generic`** 架构。
+
+## 配置文件结构
+
+两个核心共用同一个 UCI 配置 `/etc/config/daeuniverse`、服务 `/etc/init.d/daeuniverse`、日志 `/var/log/daeuniverse/daeuniverse.log` 以及面板目录 `/etc/daeuniverse/doona/`，各自保留独立且原生兼容的配置目录：
+
+```text
+/etc/daeuniverse/
+├── doona/                        # 共享 Doona 面板静态资源（honk 与 dae 共用）
+├── honk/                         # honk 核心原生配置
+│   ├── config.dae                # 主配置（含 global、data_dir、assets 与 include）
+│   ├── config.d/
+│   │   ├── node.dae              # 节点、订阅与分组（默认 policy: score）
+│   │   ├── route.dae             # 分流规则
+│   │   ├── dns.dae               # DNS（含 client_subnet: auto）
+│   │   └── api.dae               # experimental.native_api
+│   └── state/                    # 运行状态与 honk.db
+└── dae/                          # dae (kdae) 核心原生托管布局（6+1）
+    ├── config.dae                # 纯入口文件（include config.d/*.dae + api.dae）
+    ├── api.dae                   # 根段 api { ... }（满足 kdae config_write）
+    └── config.d/
+        ├── global.dae
+        ├── subscription.dae
+        ├── node.dae
+        ├── group.dae
+        ├── routing.dae
+        └── dns.dae
+```
+
+## 内核需求
+
+- **honk** 运行依赖：`kmod-sched-core`、`kmod-sched-bpf`、`kmod-veth`、`kmod-nft-queue`、`v2ray-geoip`、`v2ray-geosite`、`ca-bundle`，以及内核 BTF（或 `vmlinux-btf`）。
+- **dae (kdae)** 运行依赖：`kmod-sched-core`、`kmod-sched-bpf`、`kmod-veth`、`v2ray-geoip`、`v2ray-geosite`、`ca-bundle`，以及内核 BTF（或 `vmlinux-btf`）。`kdae` 不再使用 `AF_XDP`（不需要 `KERNEL_XDP_SOCKETS`），也不依赖 `kmod-nft-queue`。
+- 自编译 OpenWrt 固件内核建议开启：`CONFIG_KERNEL_CGROUP_BPF=y`、`CONFIG_KERNEL_BPF_EVENTS=y`、`CONFIG_KERNEL_KPROBES=y`、`CONFIG_KERNEL_KPROBE_EVENTS=y`、`CONFIG_KERNEL_DEBUG_INFO_BTF=y`。
 
 ## 编译
 
-### 宿主机依赖
+### 1. 预编译 `honk-core`
 
-构建 `honk-core` 需要 Rust、Zig、bpf-linker 和 `cargo-zigbuild`。以下命令以 Ubuntu/Debian x86_64 为例：
-
-```bash
-sudo apt-get update
-sudo apt-get install -y clang llvm libbpf-dev cmake libclang-dev zstd \
-  make perl file binutils git curl xz-utils pkg-config ca-certificates
-
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path
-. "$HOME/.cargo/env"
-
-cargo install --locked cargo-zigbuild
-
-# 从 honk/Makefile 的 pin 解析版本
-eval "$(./honk/honk_toolchain.sh)"
-
-curl -fsSL -o /tmp/bpf-linker.tar.zst \
-  "https://github.com/aya-rs/bpf-linker/releases/download/v${BPF_LINKER_VERSION}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
-echo "${BPF_LINKER_SHA256}  /tmp/bpf-linker.tar.zst" | sha256sum -c -
-sudo tar --zstd -xf /tmp/bpf-linker.tar.zst -C /usr/local/bin
-```
-
-Zig 不固定版本：从 <https://ziglang.org/download/> 取最新发行版，解包后把 `zig` 放进 `PATH` 即可。`rustup` 用 `-y` 免交互；`sudo` 没有 NOPASSWD 时需要密码。
-
-交叉编译由 `cargo-zigbuild` 驱动，脚本缺少它时会自动安装。
-
-### 编译 honk-core
-
-`honk/Makefile` 在 `honk/files/honk-core.bin` 不存在时调用同目录的 `build_honk_core.sh`。CI 和 OpenWrt-Add 的 prebuild 会提前生成二进制，构建时跳过。
-
-手动生成：
+需要 Rust、Zig、`bpf-linker` 和 `cargo-zigbuild`：
 
 ```bash
 ./honk/build_honk_core.sh x86_64
 ./honk/build_honk_core.sh aarch64_generic
 ```
 
-脚本会检查产物是目标架构的 ELF 且静态链接；目标架构变化时按 `honk-core.bin.stamp` 自动重建。构建脚本随 `honk/` 一起复制，单独放进 OpenWrt 也能构建。离线环境把 `honk-core.bin` 放到 `honk/files/` 即可。
+### 2. 预编译 `dae`（kdae）
 
-### 编译 OpenWrt 包
+需要 Go `1.26.10`（或开启 `GOTOOLCHAIN=auto`）、`clang` 与 `llvm-strip`：
 
 ```bash
-git clone https://github.com/QiuSimons/luci-app-honk package/honk
-make menuconfig   # Network -> Web Servers/Proxies -> luci-app-honk
+./dae/build_dae_core.sh x86_64
+./dae/build_dae_core.sh aarch64_generic
+```
+
+当 `dae/files/dae.bin` 已存在时，`dae/Makefile` 会直接打包预编译二进制；若不存在，则自动回退到 OpenWrt 原生 `GoBinPackage` 源码编译路径。
+
+### 3. 编译 OpenWrt 包
+
+```bash
+git clone https://github.com/QiuSimons/luci-app-daeuniverse package/daeuniverse
+make menuconfig   # Network -> Web Servers/Proxies -> luci-app-daeuniverse
 make package/honk/compile V=s
-make package/luci-app-honk/compile V=s
+make package/dae/compile V=s
+make package/luci-app-daeuniverse/compile V=s
 ```
 
-## 配置文件
-
-honk 的配置在 `/etc/honk/`：
-
-```text
-/etc/honk/
-├── config.dae          # 主配置
-├── config.d/
-│   ├── node.dae        # 节点与订阅
-│   ├── route.dae       # 分流规则
-│   ├── dns.dae         # DNS
-│   └── api.dae         # Native API 与控制面板
-└── state/              # 运行状态与 honk.db
-```
-
-首次使用前编辑 `/etc/honk/config.d/node.dae`，填入节点和订阅。
-
-## Doona
+## Doona 控制面板
 
 ![Doona 控制面板](PIC/PIC.jpg)
 
-Doona 的静态资源随 `luci-app-honk` 安装，`honk-core` 包含 `native-api`，不需要替换 debug 版核心。
+Doona 的静态资源随 `luci-app-daeuniverse` 预置安装在 `/etc/daeuniverse/doona`，两个核心的原生 API 默认均已指向该目录。
 
-## 更新
-
-更新 upstream 版本：
+## 更新上游版本
 
 ```bash
 ./scripts/update_honk_version.sh
+./scripts/update_dae_version.sh
+./scripts/update_doona.sh
 ```

@@ -8,9 +8,9 @@ UPSTREAM_REPO="Zakkaus/doona"
 IS_LITE=0
 if [ "$TARGET_DIR" = "--lite" ]; then
     IS_LITE=1
-    TARGET_DIR="$REPO_DIR/luci-app-honk/root/etc/honk/doona-lite"
+    TARGET_DIR="$REPO_DIR/luci-app-daeuniverse/root/etc/daeuniverse/doona-lite"
 elif [ -z "$TARGET_DIR" ]; then
-    TARGET_DIR="$REPO_DIR/luci-app-honk/root/etc/honk/doona"
+    TARGET_DIR="$REPO_DIR/luci-app-daeuniverse/root/etc/daeuniverse/doona"
 elif case "$TARGET_DIR" in *lite*) true ;; *) false ;; esac; then
     IS_LITE=1
 fi
