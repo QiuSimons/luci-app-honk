@@ -12,7 +12,8 @@ PKG_RELEASE:=1
 
 LUCI_TITLE:=LuCI support for DAE Universe (honk / dae)
 LUCI_PKGARCH:=all
-LUCI_DEPENDS:=@(aarch64||x86_64) +luci-base +rpcd-mod-ucode +unzip \
+LUCI_DEPENDS:=@(aarch64||x86_64) \
+	+luci-base +unzip \
 	+DAEU_WITH_HONK:honk \
 	+DAEU_WITH_DAE:dae
 PKG_CONFIG_DEPENDS:=CONFIG_DAEU_WITH_HONK CONFIG_DAEU_WITH_DAE
