@@ -209,7 +209,11 @@ function check_dae_managed_layout(config_file) {
 	let clean = strip_dae_comments(raw);
 	let has_wildcard = match(clean, /config\.d\/\*\.dae/);
 	let has_api = match(clean, /api\.dae/);
-	let stripped = replace(clean, /include[ \t\r\n]*\{[^}]*\}/g, "");
+	/* ucode regexes do not let a negated class cross a newline, so collapse
+	   whitespace before removing the include blocks. Otherwise a normal
+	   multi-line include block never matches and every entry file warns. */
+	let flat = replace(clean, /[ \t\r\n]+/g, " ");
+	let stripped = replace(flat, /include *\{[^}]*\}/g, "");
 	let extra_text = trim(stripped);
 	if (!has_wildcard || !has_api || extra_text != "") {
 		return "Entry file (" + config_file + ") should only contain include { config.d/*.dae api.dae } for kdae managed editing.";
