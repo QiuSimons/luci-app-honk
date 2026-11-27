@@ -2,7 +2,7 @@
 'require daeuniverse.common as daeu';
 
 return daeu.createConfigFileView(
-	function(core) {
+	function (core) {
 		if (core === 'dae') {
 			return [
 				{
@@ -35,7 +35,7 @@ return daeu.createConfigFileView(
 		];
 	},
 	_('Node Settings'),
-	function(core) {
+	function (core) {
 		return (core === 'dae')
 			? _('Configure subscriptions, inline nodes, and groups for DAE.')
 			: _('Configure nodes, subscriptions, and groups for HONK (/etc/daeuniverse/honk/config.d/node.dae).');
