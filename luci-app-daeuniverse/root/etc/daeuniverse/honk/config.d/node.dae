@@ -8,19 +8,10 @@ subscription {
     # 短形式：默认 86400s 刷新一次
     # sub: 'http://sub'
 
-    # 短形式 + UA：仍然只能默认 86400s
+    # 短形式 + UA：默认 86400s 刷新一次
     # sub_ua: 'http://sub'(honk/1.0 like)
 
-    # 块形式：键名可自定义，可指定刷新周期
-    #   sub2:
-    #       url: 'http://sub'
-    #       ua: 'honk/1.0'
-    #       interval: '10000s'   # 每 10000 秒刷新一次
-
-    # 禁用定期刷新
-    #   sub3:
-    #       url: 'http://sub'
-    #       interval: 0
+    # 块形式可按订阅名自定义 url / ua / interval（如 '10000s'，或设 0 禁用刷新；注意勿在注释里保留大括号）
 }
 
 group {

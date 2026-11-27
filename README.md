@@ -1,20 +1,20 @@
 # luci-app-daeuniverse
 
-OpenWrt 上的双核心透明代理 LuCI 插件与软件包套件，一套界面、一套共享 Web 面板，统一管理与切换 **honk**（`honk-core`，默认）和 **dae**（`olicesx/dae` `kdae` 分支）两大 eBPF 核心。
+OpenWrt 下的双核心透明代理 LuCI 插件与软件包套件，支持切换与管理 **honk**（`honk-core`，默认）和 **dae**（`olicesx/dae` `kdae` 分支）核心，共享同一套 UCI 配置与内置 Doona 面板。
 
 ## 软件包
 
 | 包 | 内容 |
 | --- | --- |
-| `luci-app-daeuniverse` | 统一 LuCI 页面、`/etc/init.d/daeuniverse` 服务脚本、`98-daeuniverse` 热插拔、RPCD 服务、`honk`/`dae` 默认配置与共享 Doona 面板静态资源（提供 `DAEU_WITH_HONK` / `DAEU_WITH_DAE` 条件依赖，默认全部启用） |
-| `honk` | 从 `daeuniverse/honk` `main` 最新提交编译的 `/usr/bin/honk-core` |
-| `dae` | 从 `olicesx/dae` `kdae` 最新提交编译的 `/usr/bin/dae` |
+| `luci-app-daeuniverse` | LuCI 界面、`/etc/init.d/daeuniverse` 服务脚本、`98-daeuniverse` 热插拔、RPCD 服务、`honk`/`dae` 默认配置与共享 Doona 面板静态资源（提供 `DAEU_WITH_HONK` / `DAEU_WITH_DAE` 条件依赖，默认均启用） |
+| `honk` | 从 `daeuniverse/honk` `main` 指定 commit 编译的 `/usr/bin/honk-core` |
+| `dae` | 从 `olicesx/dae` `kdae` 指定 commit 编译的 `/usr/bin/dae` |
 
-目前支持 **`x86_64`** 与 **`aarch64_generic`** 架构。
+目前支持 **`x86_64`** 与 **`aarch64_generic`** 架构。OpenWrt 包版本采用 `YYYY.MM.DD~<commit>` 以保证升级顺序，两个核心二进制内部版本号均统一为 7 位短 commit hash。
 
 ## 配置文件结构
 
-两个核心共用同一个 UCI 配置 `/etc/config/daeuniverse`、服务 `/etc/init.d/daeuniverse`、日志 `/var/log/daeuniverse/daeuniverse.log` 以及面板目录 `/etc/daeuniverse/doona/`，各自保留独立且原生兼容的配置目录：
+两个核心共用 UCI 配置 `/etc/config/daeuniverse`、服务 `/etc/init.d/daeuniverse`、日志 `/var/log/daeuniverse/daeuniverse.log` 与面板目录 `/etc/daeuniverse/doona/`，配置目录各自独立：
 
 ```text
 /etc/daeuniverse/
@@ -27,7 +27,7 @@ OpenWrt 上的双核心透明代理 LuCI 插件与软件包套件，一套界面
 │   │   ├── dns.dae               # DNS（含 client_subnet: auto）
 │   │   └── api.dae               # experimental.native_api
 │   └── state/                    # 运行状态与 honk.db
-└── dae/                          # dae (kdae) 核心原生托管布局（6+1）
+└── dae/                          # dae (kdae) 托管布局（6+1）
     ├── config.dae                # 纯入口文件（include config.d/*.dae + api.dae）
     ├── api.dae                   # 根段 api { ... }（满足 kdae config_write）
     └── config.d/
@@ -49,7 +49,7 @@ OpenWrt 上的双核心透明代理 LuCI 插件与软件包套件，一套界面
 
 ### 1. 预编译 `honk-core`
 
-需要 Rust、Zig、`bpf-linker` 和 `cargo-zigbuild`：
+需要 Rust、`zig`、`bpf-linker`、`cargo-zigbuild`、`clang`、`llvm` 与 `file`（`honk/honk_toolchain.sh` 会自动读取对应 commit 的工具链版本）：
 
 ```bash
 ./honk/build_honk_core.sh x86_64
@@ -58,14 +58,14 @@ OpenWrt 上的双核心透明代理 LuCI 插件与软件包套件，一套界面
 
 ### 2. 预编译 `dae`（kdae）
 
-需要 Go `1.26.10`（或开启 `GOTOOLCHAIN=auto`）、`clang` 与 `llvm-strip`：
+需要 Go `1.26.10+`（或开启 `GOTOOLCHAIN=auto`）、`clang`、`llvm-strip` 与 `file`：
 
 ```bash
 ./dae/build_dae_core.sh x86_64
 ./dae/build_dae_core.sh aarch64_generic
 ```
 
-当 `dae/files/dae.bin` 已存在时，`dae/Makefile` 会直接打包预编译二进制；若不存在，则自动回退到 OpenWrt 原生 `GoBinPackage` 源码编译路径。
+当 `dae/files/dae.bin` 已存在时，`dae/Makefile` 直接打包预编译二进制；若不存在，则自动回退到 OpenWrt 原生 `GoBinPackage` 源码编译路径（PGO 使用上游自带的 `default.pgo`）。
 
 ### 3. 编译 OpenWrt 包
 
@@ -76,6 +76,8 @@ make package/honk/compile V=s
 make package/dae/compile V=s
 make package/luci-app-daeuniverse/compile V=s
 ```
+
+可在 `menuconfig` 中按需取消 `DAEU_WITH_HONK` 或 `DAEU_WITH_DAE` 以只打包单个核心。
 
 ## Doona 控制面板
 
