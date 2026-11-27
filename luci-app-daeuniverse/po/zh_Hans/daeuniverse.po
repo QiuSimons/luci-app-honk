@@ -515,3 +515,6 @@ msgstr "dae 监听非回环地址时必须设置 api.secret。"
 
 msgid "native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527)."
 msgstr "native_api.listen 必须是数字形式的 IP:端口（例如 0.0.0.0:9527）。"
+
+msgid "Installed versions:"
+msgstr "已安装版本："
