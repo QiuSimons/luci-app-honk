@@ -11,7 +11,7 @@ PKG_RELEASE:=1
 
 DAE_SRC_URL:=https://github.com/olicesx/dae.git
 DAE_SRC_VERSION:=57f67ba1175613e742dc0e4e2eae7655dc9fdb72
-DAE_BRANCH:=kdae
+DAE_SHORT_VERSION:=$(shell printf '%.7s' "$(DAE_SRC_VERSION)")
 
 PKG_LICENSE:=AGPL-3.0-only
 PKG_LICENSE_FILES:=LICENSE
@@ -92,11 +92,9 @@ GO_PKG_LDFLAGS:= \
 	-s -w -buildid= \
 	-linkmode external -extldflags '-static -Wl,-s'
 GO_PKG_LDFLAGS_X:= \
-	$(GO_PKG)/cmd.Version=$(PKG_VERSION) \
+	$(GO_PKG)/cmd.Version=$(DAE_SHORT_VERSION) \
 	$(GO_PKG)/common/consts.MaxMatchSetLen_=1024
 GO_PKG_TAGS:=trace
-
-PGO_PROFILE:=$(CURDIR)/pprof/default.pgo
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/bpf.mk
@@ -118,7 +116,6 @@ DAE_CFLAGS:= \
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	[ -f "$(PGO_PROFILE)" ] && [ ! -f "$(PKG_BUILD_DIR)/default.pgo" ] && $(CP) "$(PGO_PROFILE)" "$(PKG_BUILD_DIR)/default.pgo" || true
 endef
 
 define Build/Compile

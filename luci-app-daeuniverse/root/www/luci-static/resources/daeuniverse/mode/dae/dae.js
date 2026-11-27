@@ -18,10 +18,6 @@ CodeMirror.defineMode("dae", function(config) {
       stream.skipToEnd();
       return "comment";
     }
-    if (stream.match("/*")) {
-      state.tokenize = tokenBlockComment;
-      return tokenBlockComment(stream, state);
-    }
 
     var wordPattern = /^([a-zA-Z_][a-zA-Z_0-9\/\^*.+\-=@$!#%]*|[\/\^*.+\-0-9][a-zA-Z_0-9\/\^*.+\-=@$!#%]*)/;
 
@@ -70,17 +66,6 @@ CodeMirror.defineMode("dae", function(config) {
     return null;
   }
 
-  function tokenBlockComment(stream, state) {
-    while (!stream.eol()) {
-      if (stream.match("*/")) {
-        state.tokenize = tokenBase;
-        break;
-      }
-      stream.next();
-    }
-    return "comment";
-  }
-
   return {
     startState: function() {
       return { tokenize: tokenBase, stack: [], expectOutbound: false };
@@ -105,8 +90,6 @@ CodeMirror.defineMode("dae", function(config) {
       return n * indentUnit;
     },
     lineComment: "#",
-    blockCommentStart: "/*",
-    blockCommentEnd: "*/",
     fold: "brace"
   };
 });

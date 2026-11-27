@@ -30,15 +30,17 @@ export function strip_dae_comments(content) {
 	if (!content) return "";
 	let lines = split(content, /[\r\n]+/);
 	let clean_lines = [];
+
 	for (let idx, line in lines) {
 		let in_single = false;
 		let in_double = false;
 		let escaped = false;
 		let clean = "";
 		let len = length(line);
+
 		for (let i = 0; i < len; i++) {
 			let c = substr(line, i, 1);
-			let next_c = (i + 1 < len) ? substr(line, i + 1, 1) : "";
+
 			if (escaped) {
 				escaped = false;
 				clean += c;
@@ -55,11 +57,8 @@ export function strip_dae_comments(content) {
 			} else if (c == '"' && !in_single) {
 				in_double = !in_double;
 				clean += c;
-			} else if (!in_single && !in_double) {
-				if (c == '#' || (c == '/' && next_c == '/')) {
-					break;
-				}
-				clean += c;
+			} else if (!in_single && !in_double && c == '#') {
+				break;
 			} else {
 				clean += c;
 			}
@@ -83,7 +82,7 @@ export function find_bracket_block(content, header_regex) {
 
 	for (let idx, line in lines) {
 		let trimmed = trim(line);
-		if (!in_block && !match(trimmed, /^(#|\/\/)/) && match(trimmed, header_regex)) {
+		if (!in_block && !match(trimmed, /^#/) && match(trimmed, header_regex)) {
 			in_block = true;
 			start_idx = idx;
 		}
@@ -93,7 +92,6 @@ export function find_bracket_block(content, header_regex) {
 			let escaped = false;
 			for (let i = 0; i < len; i++) {
 				let c = substr(line, i, 1);
-				let next_c = (i + 1 < len) ? substr(line, i + 1, 1) : "";
 				if (escaped) {
 					escaped = false;
 					continue;
@@ -107,7 +105,7 @@ export function find_bracket_block(content, header_regex) {
 				} else if (c == '"' && !in_single) {
 					in_double = !in_double;
 				} else if (!in_single && !in_double) {
-					if (c == '#' || (c == '/' && next_c == '/')) {
+					if (c == '#') {
 						break;
 					} else if (c == '{') {
 						depth++;
@@ -193,6 +191,7 @@ export function parse_api_config(raw_content) {
 		enabled: false,
 		config_write: false,
 		allow_anonymous_loopback: false,
+		password_auth: false,
 		listen: "",
 		ui: "",
 		secret: "",
@@ -220,6 +219,8 @@ export function parse_api_config(raw_content) {
 			res.config_write = parse_bool(v, false);
 		} else if (k == "allow_anonymous_loopback") {
 			res.allow_anonymous_loopback = parse_bool(v, false);
+		} else if (k == "password_auth") {
+			res.password_auth = parse_bool(v, false);
 		} else if (k == "listen") {
 			res.listen = unquote_scalar(v);
 		} else if (k == "secret") {
@@ -242,73 +243,29 @@ export function parse_api_config(raw_content) {
 	return res;
 }
 
-function is_valid_port_num(p) {
-	if (!p || !match(p, /^[0-9]+$/)) return false;
-	let n = +p;
-	return n >= 1 && n <= 65535;
-}
-
-function is_numeric_ip(ip) {
-	if (!ip) return false;
-	if (match(ip, /^([0-9]{1,3}\.){3}[0-9]{1,3}$/)) {
-		let octs = split(ip, ".");
-		for (let _, o in octs) {
+function is_valid_socket_addr(addr) {
+	if (!addr) return false;
+	let m = match(addr, /^(\[([0-9a-fA-F:]+)\]|([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})):([0-9]+)$/);
+	if (!m) return false;
+	let port = +m[4];
+	if (port < 1 || port > 65535) return false;
+	if (m[3]) {
+		for (let _, o in split(m[3], ".")) {
 			if (+o < 0 || +o > 255) return false;
 		}
-		return true;
-	}
-	if (match(ip, /^[0-9a-fA-F:]+$/) && index(ip, ":") >= 0) {
-		return true;
-	}
-	return false;
-}
-
-function is_loopback_ip(ip) {
-	if (!ip) return false;
-	if (ip == "::1" || ip == "0:0:0:0:0:0:0:1") return true;
-	if (match(ip, /^127\./)) return is_numeric_ip(ip);
-	return false;
-}
-
-function is_valid_api_secret(sec) {
-	if (!sec || sec == "") return false;
-	for (let i = 0; i < length(sec); i++) {
-		let code = ord(sec, i);
-		if (code < 0x21 || code > 0x7e || code == 0x2c)
-			return false;
 	}
 	return true;
 }
 
+// dae is validated authoritatively via `dae validate -c`; honk-core lacks a
+// validate subcommand, so perform lightweight native_api sanity checks here.
 export function validate_api_for_core(core, cfg) {
-	if (!cfg) return { ok: true };
-	if (core == "dae") {
-		if (cfg.config_write && (!cfg.secret || cfg.secret == "")) {
-			return { ok: false, code: "secret_required", message: "dae core requires a non-empty api.secret when config_write is enabled." };
-		}
-		if (cfg.enabled) {
-			let hp = parse_host_port(cfg.listen);
-			if (!is_numeric_ip(hp.host) || !is_valid_port_num(hp.port)) {
-				return { ok: false, code: "listen_not_numeric", message: "dae api.listen must be a numeric IP:port (for example 0.0.0.0:9527)." };
-			}
-			if (cfg.secret && cfg.secret != "") {
-				if (!is_valid_api_secret(cfg.secret)) {
-					return { ok: false, code: "secret_not_ascii", message: "dae api.secret must be visible ASCII without whitespace or commas." };
-				}
-			} else {
-				if (!cfg.allow_anonymous_loopback) {
-					return { ok: false, code: "secret_required_loopback", message: "dae api requires api.secret unless allow_anonymous_loopback is enabled on loopback." };
-				}
-				if (!is_loopback_ip(hp.host)) {
-					return { ok: false, code: "secret_required_nonloopback", message: "dae non-loopback listener requires api.secret." };
-				}
-			}
-		}
-	} else if (cfg.enabled) {
-		let hp = parse_host_port(cfg.listen);
-		if (!is_numeric_ip(hp.host) || !is_valid_port_num(hp.port)) {
-			return { ok: false, code: "native_listen_not_numeric", message: "native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527)." };
-		}
+	if (!cfg || core == "dae") return { ok: true };
+	if (cfg.config_write && (!cfg.secret || cfg.secret == "") && !cfg.password_auth) {
+		return { ok: false, code: "native_secret_required", message: "native_api.config_write requires secret or password_auth." };
+	}
+	if (cfg.enabled && !is_valid_socket_addr(cfg.listen)) {
+		return { ok: false, code: "native_listen_not_numeric", message: "native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527)." };
 	}
 	return { ok: true };
 }
@@ -319,8 +276,8 @@ export function strip_api_blocks(raw_content) {
 		let before = cleaned;
 		cleaned = remove_bracket_block(cleaned, /^clash_api[ \t]*\{/);
 		cleaned = remove_bracket_block(cleaned, /^native_api[ \t]*\{/);
-		cleaned = remove_bracket_block(cleaned, /^experimental[ \t]*\{/);
 		cleaned = remove_bracket_block(cleaned, /^api[ \t]*\{/);
+		cleaned = replace(cleaned, /[ \t]*experimental[ \t]*\{[ \t\r\n]*\}[ \t]*\n?/g, "");
 		if (cleaned == before) break;
 	}
 	return trim(cleaned);
@@ -336,6 +293,8 @@ export function render_api_file(core, cfg, raw_existing) {
 		push(body, indent + "secret: " + quote_scalar(cfg.secret));
 	if (cfg.allow_anonymous_loopback)
 		push(body, indent + "allow_anonymous_loopback: true");
+	if (cfg.password_auth && core != "dae")
+		push(body, indent + "password_auth: true");
 	if (cfg.ui && cfg.ui != "")
 		push(body, indent + "ui: " + quote_scalar(cfg.ui));
 	push(body, indent + "config_write: " + (cfg.config_write ? "true" : "false"));

@@ -4,6 +4,7 @@
 
 import { readfile, writefile, popen, stat } from 'fs';
 import { cursor } from 'uci';
+import { connect } from 'ubus';
 import {
 	DEFAULT_HOST,
 	DEFAULT_PORT,
@@ -14,7 +15,6 @@ import {
 	render_api_file
 } from 'daeuniverse_api';
 
-const BASE_DIR = "/etc/daeuniverse";
 const LOG_FILE = "/var/log/daeuniverse/daeuniverse.log";
 const DL_SCRIPT = "/usr/share/daeuniverse/download_dashboard.sh";
 const DL_LOG_FILE = "/tmp/daeuniverse_dashboard_download.log";
@@ -145,17 +145,22 @@ function is_safe_ui_dir(path) {
 	return base != "." && base != ".." && base != "honk" && base != "dae";
 }
 
-let cached_proc = { pid: null, core: null };
-
 function match_core_pid(pid, core_name, bin_name) {
 	if (!pid) return false;
 	let comm = readfile("/proc/" + pid + "/comm");
-	if (comm && trim(comm) == bin_name) {
-		let cmd = readfile("/proc/" + pid + "/cmdline");
-		if (!cmd) return true;
-		return (core_name == "dae") ? !!match(cmd, /run/) : true;
-	}
-	return false;
+	if (!comm || trim(comm) != bin_name)
+		return false;
+
+	let raw_cmd = readfile("/proc/" + pid + "/cmdline");
+	if (!raw_cmd) return false;
+
+	// /proc/<pid>/cmdline is NUL-delimited; split() avoids C-string truncation.
+	let argv = split(raw_cmd, "\x00");
+	if (core_name == "dae")
+		return length(argv) > 1 && argv[1] == "run";
+
+	// Ignore one-shot subcommands (reload, mode, proxy, delay, config, admin).
+	return length(argv) == 1 || (length(argv) > 1 && substr(argv[1], 0, 1) == "-");
 }
 
 function find_pid_by_bin(core_name, bin_name) {
@@ -171,27 +176,31 @@ function find_pid_by_bin(core_name, bin_name) {
 }
 
 function get_running_core() {
-	if (cached_proc.pid && cached_proc.core) {
-		let expected_bin = (cached_proc.core == "dae") ? "dae" : "honk-core";
-		if (match_core_pid(cached_proc.pid, cached_proc.core, expected_bin))
-			return cached_proc;
+	let bus = connect();
+	if (bus) {
+		let svc = bus.call("service", "list", { name: "daeuniverse" });
+		bus.disconnect();
+		let instances = svc && svc.daeuniverse && svc.daeuniverse.instances;
+		if (instances) {
+			for (let _, inst in instances) {
+				if (inst && inst.running && inst.pid) {
+					let bin = (inst.command && inst.command[0]) ? inst.command[0] : "";
+					let core = (bin == CORE_BINS.dae || match(bin, /\/dae$/)) ? "dae" : "honk";
+					return { pid: "" + inst.pid, core: core };
+				}
+			}
+		}
 	}
-
-	cached_proc = { pid: null, core: null };
 
 	let honk_pid = find_pid_by_bin("honk", "honk-core");
-	if (honk_pid) {
-		cached_proc = { pid: honk_pid, core: "honk" };
-		return cached_proc;
-	}
+	if (honk_pid)
+		return { pid: honk_pid, core: "honk" };
 
 	let dae_pid = find_pid_by_bin("dae", "dae");
-	if (dae_pid) {
-		cached_proc = { pid: dae_pid, core: "dae" };
-		return cached_proc;
-	}
+	if (dae_pid)
+		return { pid: dae_pid, core: "dae" };
 
-	return cached_proc;
+	return { pid: null, core: null };
 }
 
 function get_core_version(core) {
@@ -202,11 +211,10 @@ function get_core_version(core) {
 	if (p) p.close();
 	let first = trim(split(trim(out || ""), /[\r\n]+/)[0] || "");
 	if (!first) return "";
-	/* `--version` prints "<tool> [version] <ver>" with each tool wording it
-	   its own way ("honk-core 467cfa7" vs "dae version 2026.11.27~57f67ba").
-	   Keep only the trailing token so callers get a bare version. */
 	let parts = split(first, /[ \t]+/);
-	return parts[length(parts) - 1];
+	let ver = parts[length(parts) - 1];
+	let m = match(ver, /^[0-9]{4}\.[0-9]{2}\.[0-9]{2}~(.+)$/);
+	return m ? m[1] : ver;
 }
 
 function check_dae_managed_layout(config_file) {
@@ -214,13 +222,10 @@ function check_dae_managed_layout(config_file) {
 	let clean = strip_dae_comments(raw);
 	let has_wildcard = match(clean, /config\.d\/\*\.dae/);
 	let has_api = match(clean, /api\.dae/);
-	/* ucode regexes do not let a negated class cross a newline, so collapse
-	   whitespace before removing the include blocks. Otherwise a normal
-	   multi-line include block never matches and every entry file warns. */
+	// Collapse newlines so include { ... } matches across lines in ucode regexes.
 	let flat = replace(clean, /[ \t\r\n]+/g, " ");
 	let stripped = replace(flat, /include *\{[^}]*\}/g, "");
-	let extra_text = trim(stripped);
-	if (!has_wildcard || !has_api || extra_text != "") {
+	if (!has_wildcard || !has_api || trim(stripped) != "") {
 		return { code: "layout_unmanaged", detail: config_file };
 	}
 	return null;
@@ -241,20 +246,18 @@ function run_dae_validate(config_file) {
 }
 
 function get_api_config(core) {
-	core = (core == "dae") ? "dae" : get_uci_core();
+	if (core != "dae" && core != "honk")
+		core = get_uci_core();
 	let api_file = get_core_api_file(core);
 	let raw = readfile(api_file) || "";
-	let parsed = parse_api_config(raw);
 	return {
 		file: api_file,
 		raw: raw,
-		parsed: parsed
+		parsed: parse_api_config(raw)
 	};
 }
 
 function prepare_core_switch(target_core) {
-	cached_proc = { pid: null, core: null };
-
 	if (target_core != "honk" && target_core != "dae")
 		return { success: false, code: "invalid_core", detail: target_core, message: "Invalid core: " + target_core };
 
@@ -328,8 +331,7 @@ function get_dashboard_info(req) {
 
 		res.external_ui = (parsed.ui && !is_other_default_ui(parsed.ui, requested_type)) ? parsed.ui : target_default_ui;
 
-		let index_path = res.external_ui + "/index.html";
-		let s = stat(index_path);
+		let s = stat(res.external_ui + "/index.html");
 		res.has_ui = (s && s.type == "file") ? true : false;
 
 		if (!res.has_ui) {
@@ -371,8 +373,7 @@ function download_dashboard(req) {
 	if (!is_safe_ui_dir(target_dir))
 		return { success: false, code: "unsafe_target", message: "Refusing to deploy to an unsafe target directory" };
 
-	let s = stat(DL_SCRIPT);
-	if (!s) {
+	if (!stat(DL_SCRIPT)) {
 		return { success: false, code: "script_missing", detail: DL_SCRIPT, message: "Script not found: " + DL_SCRIPT };
 	}
 
@@ -382,8 +383,7 @@ function download_dashboard(req) {
 	let safe_type = replace(requested_type, "'", "'\\''");
 
 	let cmd = sprintf("/bin/sh '%s' '%s' '%s' '%s' >/dev/null 2>&1 &", safe_script, safe_target, safe_url, safe_type);
-	let rc = system(cmd);
-	if (rc != 0)
+	if (system(cmd) != 0)
 		return { success: false, code: "download_failed", message: "failed to dispatch the download task" };
 
 	return { success: true, target_dir: target_dir, url: url, queued: true };
@@ -399,7 +399,7 @@ function update_core_api_dashboard(core, target_type, target_ui, has_target_ui) 
 		if (parsed && parsed.format && parsed.enabled) {
 			parsed.enabled = false;
 			writefile(api_file, render_api_file(core, parsed, raw));
-			system("chmod 600 '" + api_file + "' 2>/dev/null || true");
+			system("chmod 600 '" + replace(api_file, "'", "'\\''") + "' 2>/dev/null || true");
 			return true;
 		}
 		return false;
@@ -410,22 +410,28 @@ function update_core_api_dashboard(core, target_type, target_ui, has_target_ui) 
 	next_cfg.config_write = true;
 	if (!next_cfg.listen || next_cfg.listen == "")
 		next_cfg.listen = DEFAULT_HOST + ":" + DEFAULT_PORT;
-	if (!next_cfg.secret || length(next_cfg.secret) < 16)
-		next_cfg.secret = (next_cfg.secret && length(next_cfg.secret) >= 8 && core == "honk") ? next_cfg.secret : DEFAULT_SECRET;
-	next_cfg.ui = has_target_ui ? target_ui : next_cfg.ui;
+	if ((!next_cfg.secret || next_cfg.secret == "") && !next_cfg.password_auth)
+		next_cfg.secret = DEFAULT_SECRET;
+
+	if (has_target_ui) {
+		next_cfg.ui = target_ui;
+	} else if (next_cfg.ui) {
+		// honk-core fails at startup if native_api.ui points to a missing directory.
+		let existing_ui = stat(next_cfg.ui + "/index.html");
+		if (!existing_ui || existing_ui.type != "file")
+			next_cfg.ui = "";
+	}
 
 	let next_raw = render_api_file(core, next_cfg, raw);
 	if (next_raw != raw) {
 		writefile(api_file, next_raw);
-		system("chmod 600 '" + api_file + "' 2>/dev/null || true");
+		system("chmod 600 '" + replace(api_file, "'", "'\\''") + "' 2>/dev/null || true");
 		return true;
 	}
 	return false;
 }
 
-function switch_dashboard_api(target_type) {
-	cached_proc = { pid: null, core: null };
-
+function switch_dashboard_api(target_type, defer_apply) {
 	target_type = normalize_dashboard_type(target_type);
 	if (!is_valid_dashboard_type(target_type))
 		return { success: false, code: "invalid_dashboard_type", message: "Invalid dashboard type" };
@@ -437,21 +443,24 @@ function switch_dashboard_api(target_type) {
 
 	system("mkdir -p /etc/daeuniverse/honk/config.d /etc/daeuniverse/dae");
 
-	let u = cursor();
-	if (u) {
-		u.load("daeuniverse");
-		let sid = "config";
-		if (!u.get("daeuniverse", sid)) {
-			u.foreach("daeuniverse", "daeuniverse", function(s) { sid = s[".name"]; });
+	if (!defer_apply) {
+		let u = cursor();
+		if (u) {
+			u.load("daeuniverse");
+			let sid = "config";
+			if (!u.get("daeuniverse", sid)) {
+				u.foreach("daeuniverse", "daeuniverse", function(s) { sid = s[".name"]; });
+			}
+			u.set("daeuniverse", sid, "dashboard", target_type || "none");
+			u.commit("daeuniverse");
 		}
-		u.set("daeuniverse", sid, "dashboard", target_type || "none");
-		u.commit("daeuniverse");
 	}
 
 	if (target_type == "none" || !target_type) {
 		let changed = update_core_api_dashboard(active_core, "none", "", false);
-		update_core_api_dashboard(other_core, "none", "", false);
-		if (changed) {
+		if (stat(get_core_api_file(other_core)))
+			update_core_api_dashboard(other_core, "none", "", false);
+		if (changed && !defer_apply) {
 			system("/etc/init.d/daeuniverse restart >/dev/null 2>&1 &");
 			return { success: true, type: "none", queued: true };
 		}
@@ -459,8 +468,7 @@ function switch_dashboard_api(target_type) {
 	}
 
 	let target_ui = get_dashboard_dir(target_type);
-	let index_path = target_ui + "/index.html";
-	let s = stat(index_path);
+	let s = stat(target_ui + "/index.html");
 	let has_target_ui = (s && s.type == "file") ? true : false;
 
 	if (!has_target_ui && parsed && parsed.enabled && parsed.listen) {
@@ -469,17 +477,23 @@ function switch_dashboard_api(target_type) {
 
 	if (parsed && parsed.format == active_core && parsed.enabled &&
 	    parsed.listen && parsed.config_write &&
-	    parsed.secret && parsed.ui == target_ui &&
-	    has_target_ui) {
-		update_core_api_dashboard(other_core, target_type, target_ui, has_target_ui);
+	    (parsed.secret || parsed.password_auth) &&
+	    parsed.ui == target_ui && has_target_ui) {
+		if (stat(get_core_api_file(other_core)))
+			update_core_api_dashboard(other_core, target_type, target_ui, has_target_ui);
 		return { success: true, type: target_type };
 	}
 
 	update_core_api_dashboard(active_core, target_type, target_ui, has_target_ui);
-	update_core_api_dashboard(other_core, target_type, target_ui, has_target_ui);
-	system("/etc/init.d/daeuniverse restart >/dev/null 2>&1 &");
+	if (stat(get_core_api_file(other_core)))
+		update_core_api_dashboard(other_core, target_type, target_ui, has_target_ui);
 
-	return { success: true, type: target_type, queued: true };
+	if (!defer_apply) {
+		system("/etc/init.d/daeuniverse restart >/dev/null 2>&1 &");
+		return { success: true, type: target_type, queued: true };
+	}
+
+	return { success: true, type: target_type };
 }
 
 return {
@@ -514,9 +528,10 @@ return {
 			call: function(req) {
 				let proc = get_running_core();
 				let installed = get_installed_cores();
+				let configured = get_uci_core();
 				return {
-					configured_core: get_uci_core(),
-					active_core: proc.core || get_uci_core(),
+					configured_core: configured,
+					active_core: proc.core || configured,
 					running: !!proc.pid,
 					installed_cores: installed,
 					versions: {
@@ -558,11 +573,9 @@ return {
 
 		reload: {
 			call: function(req) {
-				cached_proc = { pid: null, core: null };
-
 				let rc = system("/etc/init.d/daeuniverse hot_reload >/dev/null 2>&1 &");
 				if (rc != 0)
-					return { success: false, code: "reload_failed", message: "failed to dispatch hot_reload" };
+					return { success: false, code: "reload_failed", message: "failed to trigger hot_reload" };
 
 				return { success: true, queued: true };
 			}
@@ -570,11 +583,9 @@ return {
 
 		restart: {
 			call: function(req) {
-				cached_proc = { pid: null, core: null };
-
 				let rc = system("/etc/init.d/daeuniverse restart >/dev/null 2>&1 &");
 				if (rc != 0)
-					return { success: false, code: "restart_failed", message: "failed to dispatch restart" };
+					return { success: false, code: "restart_failed", message: "failed to trigger restart" };
 
 				return { success: true, queued: true };
 			}
@@ -618,10 +629,11 @@ return {
 		},
 
 		switch_dashboard_api: {
-			args: { type: "string" },
+			args: { type: "string", defer_apply: true },
 			call: function(req) {
 				let t = req.args ? req.args.type : "none";
-				return switch_dashboard_api(t);
+				let defer_apply = !!(req.args && req.args.defer_apply);
+				return switch_dashboard_api(t, defer_apply);
 			}
 		}
 	}

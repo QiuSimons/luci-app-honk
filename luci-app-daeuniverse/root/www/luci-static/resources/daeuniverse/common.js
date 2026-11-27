@@ -106,7 +106,7 @@ var callDownloadStatus = rpc.declare({
 var callSwitchDashboardApi = rpc.declare({
 	object: 'luci.daeuniverse',
 	method: 'switch_dashboard_api',
-	params: [ 'type' ],
+	params: [ 'type', 'defer_apply' ],
 	expect: { }
 });
 
@@ -202,11 +202,6 @@ function waitForServiceState(wantRunning, attempts) {
 	});
 }
 
-/*
- * Backend failures carry a stable `code` next to the English `message`.
- * Translate the known codes here so the UI follows the selected locale, and
- * fall back to the raw message (which is what older backends send).
- */
 function msgText(res, fallback) {
 	var d = (res && res.detail) ? String(res.detail) : '';
 
@@ -223,9 +218,9 @@ function msgText(res, fallback) {
 		case 'layout_unmanaged':
 			return _('Entry file should only contain include { config.d/*.dae api.dae } for kdae managed editing.') + (d ? ' (' + d + ')' : '');
 		case 'reload_failed':
-			return _('Failed to dispatch hot reload');
+			return _('Failed to reload service');
 		case 'restart_failed':
-			return _('Failed to dispatch restart');
+			return _('Failed to restart service');
 		case 'invalid_url':
 			return _('Invalid URL');
 		case 'unsafe_target':
@@ -233,19 +228,11 @@ function msgText(res, fallback) {
 		case 'script_missing':
 			return _('Download script not found') + (d ? ': ' + d : '');
 		case 'download_failed':
-			return _('Failed to dispatch the download task');
+			return _('Failed to start download task');
 		case 'invalid_dashboard_type':
 			return _('Invalid dashboard type');
-		case 'secret_required':
-			return _('dae core requires a non-empty api.secret when config_write is enabled.');
-		case 'listen_not_numeric':
-			return _('dae api.listen must be a numeric IP:port (for example 0.0.0.0:9527).');
-		case 'secret_not_ascii':
-			return _('dae api.secret must be visible ASCII without whitespace or commas.');
-		case 'secret_required_loopback':
-			return _('dae api requires api.secret unless allow_anonymous_loopback is enabled on loopback.');
-		case 'secret_required_nonloopback':
-			return _('dae non-loopback listener requires api.secret.');
+		case 'native_secret_required':
+			return _('native_api.config_write requires secret or password_auth.');
 		case 'native_listen_not_numeric':
 			return _('native_api.listen must be a numeric IP:port (for example 0.0.0.0:9527).');
 		}
@@ -254,15 +241,15 @@ function msgText(res, fallback) {
 	return (res && res.message) || fallback;
 }
 
-function switchDashboardAndWait(type) {
-	return callSwitchDashboardApi(type).then(function(resp) {
+function switchDashboardAndWait(type, deferApply) {
+	return callSwitchDashboardApi(type, !!deferApply).then(function(resp) {
 		if (!resp || resp.success === false)
 			throw new Error(msgText(resp, _('Service did not accept the request')));
 
 		if (resp.pending_download)
 			return { pending: true };
 
-		if (!isServiceEnabled())
+		if (deferApply || !isServiceEnabled())
 			return { pending: false, running: null };
 
 		return waitForServiceState(true).then(function(st) {
@@ -540,37 +527,42 @@ function formatEditor(ed) {
 			lineStr = lineStr.replace(/^(\s*[a-zA-Z0-9_-]+)\s*:\s*(\S.*)$/, '$1: $2');
 			lineStr = lineStr.replace(/^(\s*[a-zA-Z0-9_-]+)\s*:\s*$/, '$1:');
 
-			var quoteParts = lineStr.split(/(['"])/);
-			var inQuote = false;
-			var currentQuote = '';
-			for (var j = 0; j < quoteParts.length; j++) {
-				var part = quoteParts[j];
-				if (part === "'" || part === '"') {
-					if (!inQuote) {
-						inQuote = true;
-						currentQuote = part;
-					} else if (part === currentQuote) {
-						inQuote = false;
-						currentQuote = '';
+			var out = '';
+			var seg = '';
+			var inQuote = '';
+			var escaped = false;
+			for (var j = 0; j < lineStr.length; j++) {
+				var ch = lineStr.charAt(j);
+				if (inQuote) {
+					out += ch;
+					if (escaped) {
+						escaped = false;
+					} else if (ch === '\\') {
+						escaped = true;
+					} else if (ch === inQuote) {
+						inQuote = '';
 					}
-				} else if (!inQuote) {
-					var hashIdx = part.indexOf('#');
-					if (hashIdx !== -1) {
-						var codeSub = part.slice(0, hashIdx);
-						var commentSub = part.slice(hashIdx);
-						codeSub = formatCodeSegment(codeSub);
-						if (codeSub.length > 0 && !/\s$/.test(codeSub)) {
-							codeSub += ' ';
-						}
-						quoteParts[j] = codeSub + commentSub.trimEnd();
-						quoteParts.splice(j + 1);
-						break;
-					} else {
-						quoteParts[j] = formatCodeSegment(part);
-					}
+					continue;
 				}
+				if (ch === "'" || ch === '"') {
+					out += formatCodeSegment(seg) + ch;
+					seg = '';
+					inQuote = ch;
+					continue;
+				}
+				if (ch === '#') {
+					var formattedSeg = formatCodeSegment(seg);
+					if (formattedSeg.length > 0 && !/\s$/.test(formattedSeg)) {
+						formattedSeg += ' ';
+					}
+					out += formattedSeg + lineStr.slice(j).trimEnd();
+					seg = '';
+					return out.trimEnd();
+				}
+				seg += ch;
 			}
-			return quoteParts.join('').trimEnd();
+			out += formatCodeSegment(seg);
+			return out.trimEnd();
 		};
 
 		var lines = content.split('\n');
@@ -580,22 +572,21 @@ function formatEditor(ed) {
 				return '';
 			}
 
-			if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
-				var prefix = trimmed.startsWith('//') ? '//' : '#';
-				var afterComment = trimmed.slice(prefix.length);
+			if (trimmed.startsWith('#')) {
+				var afterComment = trimmed.slice(1);
 
 				var kvMatch = afterComment.match(/^(\s*)([a-zA-Z0-9_-]+)\s*:\s*(.*)$/);
 				if (kvMatch) {
 					var space = kvMatch[1];
 					var key = kvMatch[2];
 					var val = kvMatch[3].trim();
-					return (line.match(/^\s*/)[0] + prefix + space + key + ': ' + val).trimEnd();
+					return (line.match(/^\s*/)[0] + '#' + space + key + ': ' + val).trimEnd();
 				}
 
 				if (afterComment.indexOf('->') !== -1 || afterComment.indexOf('&&') !== -1) {
 					var leadingWs = line.match(/^\s*/)[0];
 					var formattedCommentCode = formatLineCode(afterComment);
-					return (leadingWs + prefix + (afterComment.startsWith(' ') ? ' ' : '') + formattedCommentCode.trim()).trimEnd();
+					return (leadingWs + '#' + (afterComment.startsWith(' ') ? ' ' : '') + formattedCommentCode.trim()).trimEnd();
 				}
 
 				return line.trimEnd();
@@ -958,18 +949,21 @@ function hideMenuEntries(hidden) {
 }
 
 function hideTabLinks(hidden) {
-	if (!hidden.length)
-		return;
-
-	var targets = hidden.map(function(name) {
-		return L.url('admin', 'services', 'daeuniverse', name);
+	var allTargets = {};
+	ADVANCED_TABS.concat(['api']).forEach(function(name) {
+		allTargets[L.url('admin', 'services', 'daeuniverse', name)] = hidden.indexOf(name) !== -1;
 	});
 
 	document.querySelectorAll('a[href]').forEach(function(link) {
-		if (link.closest('#view') || targets.indexOf(link.pathname) === -1)
+		if (link.closest('#view') || !(link.pathname in allTargets))
 			return;
 
-		(link.closest('li') || link).style.setProperty('display', 'none', 'important');
+		var el = link.closest('li') || link;
+		if (allTargets[link.pathname]) {
+			el.style.setProperty('display', 'none', 'important');
+		} else {
+			el.style.removeProperty('display');
+		}
 	});
 }
 

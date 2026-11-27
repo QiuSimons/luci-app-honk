@@ -7,6 +7,7 @@ UPTIME=$(cut -d. -f1 /proc/uptime 2>/dev/null)
 [ -n "$UPTIME" ] && [ "$UPTIME" -lt 30 ] && exit 0
 
 [ "$(uci -q get daeuniverse.config.enabled)" = "1" ] || exit 0
+# honk tracks netlink interface/address updates internally; only dae needs WAN reload.
 [ "$(uci -q get daeuniverse.config.core)" = "dae" ] || exit 0
 
 . /lib/functions/network.sh

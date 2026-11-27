@@ -20,7 +20,7 @@ OUT_FILE="${2:-}"
 SRC_DIR="${3:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export PATH="/usr/local/go/bin:${HOME:-}/go/bin:${PATH:-}"
+export PATH="${PATH:-}:/usr/local/go/bin:${HOME:-}/go/bin"
 
 case "$TARGET_IN" in
   x86_64|amd64|x86_64-unknown-linux-musl|x86_64-openwrt-linux*)
@@ -64,7 +64,7 @@ MAKEFILE="${DAE_MAKEFILE:-$SCRIPT_DIR/Makefile}"
 
 DAE_SRC_URL="$(sed -n 's/^[[:space:]]*DAE_SRC_URL:=//p' "$MAKEFILE" | head -n 1)"
 DAE_SRC_VERSION="$(sed -n 's/^[[:space:]]*DAE_SRC_VERSION:=//p' "$MAKEFILE" | head -n 1)"
-PKG_VERSION="$(sed -n 's/^[[:space:]]*PKG_VERSION:=//p' "$MAKEFILE" | head -n 1)"
+DAE_SHORT_VERSION="${DAE_SRC_VERSION:0:7}"
 
 [ -n "$DAE_SRC_URL" ] && [ -n "$DAE_SRC_VERSION" ] || {
   echo "ERROR: DAE_SRC_URL / DAE_SRC_VERSION missing in $MAKEFILE" >&2
@@ -129,10 +129,6 @@ fi
 
 cd "$SRC_DIR"
 
-if [ -f "$SCRIPT_DIR/pprof/default.pgo" ] && [ ! -f "$SRC_DIR/default.pgo" ]; then
-  cp -f "$SCRIPT_DIR/pprof/default.pgo" "$SRC_DIR/default.pgo"
-fi
-
 export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
 echo "==> $(go version)"
 echo "==> clang: $BPF_CLANG ($($BPF_CLANG --version | head -n 1))"
@@ -168,7 +164,7 @@ GOOS=linux \
 GOARCH="$GO_ARCH" \
 GOEXPERIMENT="$DAE_GOEXPERIMENT" \
 go build -tags trace -trimpath -buildvcs=false -pgo=auto \
-  -ldflags "-s -w -buildid= -X github.com/daeuniverse/dae/cmd.Version=${PKG_VERSION:-unstable} -X github.com/daeuniverse/dae/common/consts.MaxMatchSetLen_=1024" \
+  -ldflags "-s -w -buildid= -X github.com/daeuniverse/dae/cmd.Version=${DAE_SHORT_VERSION:-unstable} -X github.com/daeuniverse/dae/common/consts.MaxMatchSetLen_=1024" \
   -o "$TMP_BIN" .
 
 [ -f "$TMP_BIN" ] || { echo "ERROR: expected output not found at $TMP_BIN" >&2; exit 1; }
@@ -183,7 +179,6 @@ case "$FILE_DESC" in
   *) echo "ERROR: unexpected arch ($ELF_EXPECT expected): $FILE_DESC" >&2; exit 1 ;;
 esac
 
-mkdir -p "$(dirname "$OUT_FILE")"
 chmod +x "$TMP_BIN"
 mv -f "$TMP_BIN" "$OUT_FILE"
 printf '%s\n' "$STAMP_TARGET" > "$OUT_FILE.stamp"

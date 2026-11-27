@@ -101,6 +101,11 @@ restore_resolv_conf() {
     rm -f "$RESOLV_FILE"
 }
 
+get_running_bin() {
+    ubus call service list '{"name":"daeuniverse"}' 2>/dev/null | \
+        jsonfilter -e '@.daeuniverse.instances.daeuniverse.command[0]' 2>/dev/null
+}
+
 start_service() {
     local enabled core prog config_file
 
@@ -117,25 +122,25 @@ start_service() {
 
     config_file=$(get_core_config_file "$core")
     set_perms
+
+    if [ "$core" = "dae" ]; then
+        if ! DAE_LOCATION_ASSET="/usr/share/v2ray" "$prog" validate -c "$config_file"; then
+            logger -t daeuniverse "dae config validation failed for $config_file"
+            return 1
+        fi
+    fi
+
     cleanup_netns
+    hijack_resolv_conf
 
+    procd_open_instance "$CONF"
     if [ "$core" = "honk" ]; then
-        hijack_resolv_conf
-
-        procd_open_instance "$CONF"
         procd_set_param env \
             DAE_LOCATION_ASSET="/usr/share/v2ray" \
             MIMALLOC_ARENA_RESERVE="0" \
             MALLOC_CONF="retain:false"
         procd_set_param command "$prog" --config "$config_file" --log-file "$LOG_FILE"
     else
-        if ! DAE_LOCATION_ASSET="/usr/share/v2ray" "$prog" validate -c "$config_file"; then
-            logger -t daeuniverse "dae config validation failed for $config_file"
-            return 1
-        fi
-        hijack_resolv_conf
-
-        procd_open_instance "$CONF"
         if uname -r | grep -Eq "^6\.6"; then
             procd_set_param env \
                 DAE_LOCATION_ASSET="/usr/share/v2ray" \
@@ -175,13 +180,28 @@ service_triggers() {
 }
 
 hot_reload() {
-    local core prog
+    local core prog running_bin config_file
     core=$(get_active_core)
     prog=$(get_core_bin "$core")
 
     set_perms
     if /etc/init.d/daeuniverse running; then
-        "$prog" reload
+        running_bin=$(get_running_bin)
+        if [ -n "$running_bin" ] && [ "$running_bin" != "$prog" ]; then
+            reload_service
+            return $?
+        fi
+        if [ "$core" = "dae" ]; then
+            config_file=$(get_core_config_file "$core")
+            if ! DAE_LOCATION_ASSET="/usr/share/v2ray" "$prog" validate -c "$config_file"; then
+                logger -t daeuniverse "dae hot_reload aborted: config validation failed"
+                return 1
+            fi
+        fi
+        "$prog" reload || {
+            logger -t daeuniverse "$core hot_reload failed"
+            return 1
+        }
     else
         start
     fi

@@ -36,10 +36,7 @@ return view.extend({
 					sel.disabled = true;
 					daeu.switchDashboardAndWait(newType).then(function(res) {
 						if (res && res.pending) {
-							sel.disabled = false;
 							daeu.showNotification(null, E('p', _('Saved, but the panel files are not installed yet — download the panel first.')), 'warning');
-							loadInfo(true);
-							return;
 						}
 
 						daeu.refreshTabVisibility().then(function() {

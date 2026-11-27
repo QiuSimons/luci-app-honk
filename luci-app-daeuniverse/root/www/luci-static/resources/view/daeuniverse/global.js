@@ -64,6 +64,7 @@ return view.extend({
 				return _('dae is not installed on this system.');
 			return true;
 		};
+		this._coreOption = o;
 
 		o = s.option(form.Flag, 'advanced', _('Advanced Settings'), _('Enable to display full configuration editor and advanced routing/DNS/node tabs.'));
 		o.rmempty = false;
@@ -103,6 +104,7 @@ return view.extend({
 		};
 
 		this._editorDirty = false;
+		this._initialCore = initialCore;
 		var self = this;
 		daeu.bindCodeMirrorToMap(m, function() {
 			self._editorDirty = true;
@@ -115,62 +117,71 @@ return view.extend({
 		var sid = (sections && sections[0]) ? sections[0]['.name'] : '@daeuniverse[0]';
 		var oldDash = uci.get('daeuniverse', sid, 'dashboard') || 'doona';
 		var oldCore = uci.get('daeuniverse', sid, 'core') || 'honk';
+		var initialCore = this._initialCore || oldCore;
 		var editorDirty = !!this._editorDirty;
+		var selectedCore = (this._coreOption && this._coreOption.formvalue(sid)) || oldCore;
 		var self = this;
 
-		return this.handleSave(ev).then(function() {
+		// Validate target core before mutating UCI or files so failed switches leave no dirty state.
+		var preCheck = (selectedCore !== oldCore)
+			? daeu.callPrepareCoreSwitch(selectedCore).then(function(res) {
+				if (!res || res.success === false)
+					throw new Error(daeu.msgText(res, _('Failed to prepare target core')));
+				if (res.warning)
+					daeu.showNotification(null, E('p', daeu.msgText(res.warning)), 'warning', 6000);
+			})
+			: Promise.resolve();
+
+		return preCheck.then(function() {
+			return self.handleSave(ev);
+		}).then(function() {
 			var newDash = uci.get('daeuniverse', sid, 'dashboard') || 'doona';
 			var newCore = uci.get('daeuniverse', sid, 'core') || 'honk';
 			var newEnabled = uci.get('daeuniverse', sid, 'enabled') || '0';
 
 			daeu.applyTabVisibility();
 
-			var coreStep = (newCore !== oldCore) ? daeu.callPrepareCoreSwitch(newCore).then(function(res) {
-				if (!res || res.success === false) {
-					uci.set('daeuniverse', sid, 'core', oldCore);
-					return uci.save().then(function() {
-						throw new Error(daeu.msgText(res, _('Failed to prepare target core')));
-					});
-				}
-				if (res.warning) {
-					daeu.showNotification(null, E('p', daeu.msgText(res.warning)), 'warning', 6000);
-				}
-			}) : Promise.resolve();
-
-			return coreStep.then(function() {
-				var dashStep = (newDash !== oldDash) ? daeu.switchDashboardAndWait(newDash).then(function(res) {
+			var dashStep = (newDash !== oldDash)
+				? daeu.switchDashboardAndWait(newDash, true).then(function(res) {
 					if (res && res.pending)
 						daeu.showNotification(null, E('p', _('Saved, but the panel files are not installed yet — download the panel first.')), 'warning');
-					else if (res && res.running === false)
-						throw new Error(_('Service did not come back up; check the logs'));
-				}) : Promise.resolve();
+				})
+				: Promise.resolve();
 
-				return dashStep.then(function() {
-					self._editorDirty = false;
+			return dashStep.then(function() {
+				self._editorDirty = false;
 
-					var applyChecks = (editorDirty && newEnabled === '1')
-						? daeu.callValidateConfig(newCore).then(function(vres) {
-							if (vres && vres.valid === false)
-								throw new Error(daeu.msgText(vres, _('Configuration validation failed')));
-							return daeu.callReload();
-						}).then(function(r) {
-							if (!r || r.success === false)
-								throw new Error(daeu.msgText(r, _('Service did not accept the request')));
-						})
-						: Promise.resolve();
+				var validateEdited = (editorDirty && newEnabled === '1')
+					? daeu.callValidateConfig(initialCore).then(function(vres) {
+						if (vres && vres.valid === false)
+							throw new Error(daeu.msgText(vres, _('Configuration validation failed')));
+						if (vres && vres.warning)
+							daeu.showNotification(null, E('p', daeu.msgText(vres.warning)), 'warning', 6000);
+					})
+					: Promise.resolve();
 
-					return applyChecks.then(function() {
-						/*
-						 * uci.changes() is an RPC in this LuCI release, so it
-						 * returns a Promise: probing it with Object.keys() always
-						 * looked empty and skipped the commit, which left every
-						 * save staged but never applied while the page still
-						 * reported success. Commit unconditionally instead, the
-						 * way the stock handleSaveApply does.
-						 */
-						if (ui.changes && typeof ui.changes.apply === 'function')
-							return ui.changes.apply(mode == '0');
+				return validateEdited.then(function() {
+					return uci.changes().then(function(changes) {
+						var hasUciChanges = !!(changes && changes.daeuniverse && changes.daeuniverse.length);
+						if (hasUciChanges) {
+							// uci.changes() is async in LuCI; commit once here so procd handles restart cleanly.
+							if (ui.changes && typeof ui.changes.apply === 'function')
+								return ui.changes.apply(mode == '0');
+							return null;
+						}
 
+						if (editorDirty && newEnabled === '1') {
+							return daeu.callReload().then(function(r) {
+								if (!r || r.success === false)
+									throw new Error(daeu.msgText(r, _('Service did not accept the request')));
+								return daeu.callStatus();
+							}).then(function(st) {
+								daeu.updateStatus(st);
+								daeu.showNotification(null, E('p', _('Configuration applied and service reloaded.')), 'info');
+							});
+						}
+
+						daeu.showNotification(null, E('p', _('Configuration saved.')), 'info');
 						return null;
 					});
 				});
