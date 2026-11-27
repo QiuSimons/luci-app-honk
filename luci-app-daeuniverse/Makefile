@@ -18,7 +18,6 @@ LUCI_DEPENDS:=@(aarch64||x86_64) +luci-base +rpcd-mod-ucode +unzip \
 PKG_CONFIG_DEPENDS:=CONFIG_DAEU_WITH_HONK CONFIG_DAEU_WITH_DAE
 
 define Package/luci-app-daeuniverse/config
-	if PACKAGE_luci-app-daeuniverse
 	config DAEU_WITH_HONK
 		bool "Include honk core engine (default core)"
 		default y
@@ -26,7 +25,6 @@ define Package/luci-app-daeuniverse/config
 	config DAEU_WITH_DAE
 		bool "Include dae core engine (kdae)"
 		default y
-	endif
 endef
 
 define Package/luci-app-daeuniverse/conffiles
