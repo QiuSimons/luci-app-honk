@@ -40,15 +40,17 @@ return view.extend({
 		s.anonymous = true;
 		s.addremove = false;
 
-		o = s.option(form.Flag, 'enabled', _('Enabled'));
-		o.rmempty = false;
-
 		var installedVers = [];
 		if (versions.honk) installedVers.push('honk ' + versions.honk);
 		if (versions.dae) installedVers.push('dae ' + versions.dae);
+		var enabledDesc = installedVers.length
+			? _('Installed versions:') + ' ' + installedVers.join(' \u00b7 ')
+			: null;
+
+		o = s.option(form.Flag, 'enabled', _('Enabled'), enabledDesc);
+		o.rmempty = false;
+
 		var coreDesc = _('Select the proxy engine core. Each core uses its own native configuration directory under /etc/daeuniverse/.');
-		if (installedVers.length)
-			coreDesc += ' ' + _('Installed versions:') + ' ' + installedVers.join(' \u00b7 ');
 
 		o = s.option(form.ListValue, 'core', _('Core Engine'), coreDesc);
 		o.value('honk', installed.honk !== false ? _('honk (Default)') : _('honk (Not installed)'));
