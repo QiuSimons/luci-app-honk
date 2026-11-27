@@ -6,7 +6,7 @@ include {
 
 global {
     log_level: warn
-    check_interval: 600s
+    check_interval: 300s
     check_tolerance: 30ms
     lan_interface: br-lan
     wan_interface: auto
