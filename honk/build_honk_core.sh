@@ -131,6 +131,10 @@ export BINDGEN_EXTRA_CLANG_ARGS="$(
          /^-D$/ { getline; if ($0 != "_DEBUG") printf "-D%s ", $0 }'
 )"
 
+# A caller-set linker for this target (OpenWrt-Add pins gcc for its other Rust
+# packages) would beat cargo-zigbuild's own and link musl CRT objects with it.
+unset "CARGO_TARGET_$(printf '%s' "$RUST_TARGET" | tr 'a-z-' 'A-Z_')_LINKER"
+
 echo "==> Building honk-core for $RUST_TARGET..."
 cargo zigbuild --release --locked \
   -p honk-core \
