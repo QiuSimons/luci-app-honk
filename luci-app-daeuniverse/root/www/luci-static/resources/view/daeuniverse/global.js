@@ -53,7 +53,7 @@ return view.extend({
 		var coreDesc = _('Select the proxy engine core. Each core uses its own native configuration directory under /etc/daeuniverse/.');
 
 		o = s.option(form.ListValue, 'core', _('Core Engine'), coreDesc);
-		o.value('honk', installed.honk !== false ? _('honk (Default)') : _('honk (Not installed)'));
+		o.value('honk', installed.honk !== false ? _('honk') : _('honk (Not installed)'));
 		o.value('dae', installed.dae !== false ? _('dae') : _('dae (Not installed)'));
 		o.default = 'honk';
 		o.rmempty = false;
