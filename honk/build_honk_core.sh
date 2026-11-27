@@ -96,12 +96,7 @@ if ! command -v cargo-zigbuild >/dev/null 2>&1; then
 fi
 command -v bpf-linker >/dev/null 2>&1 || { echo "ERROR: bpf-linker not found in PATH" >&2; exit 1; }
 
-ZIG_ACTUAL="$(zig version)"
-if [ "$ZIG_ACTUAL" != "$ZIG_VERSION" ]; then
-  echo "ERROR: zig ${ZIG_ACTUAL} does not match the honk pin ${ZIG_VERSION}" >&2
-  exit 1
-fi
-echo "==> zig ${ZIG_ACTUAL}"
+echo "==> zig $(zig version)"
 
 # bpf-linker 0.11.0 reports 0.0.0; its tarball is checked by sha256 at install time.
 echo "==> $(bpf-linker --version 2>/dev/null | head -n 1)"

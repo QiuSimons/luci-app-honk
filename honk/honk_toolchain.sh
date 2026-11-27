@@ -5,7 +5,8 @@
 #
 # Prints HONK_SRC_URL / HONK_SRC_VERSION plus BPF_LINKER_VERSION / SHA256, read
 # from that commit's .github/ci/pins.env (or from --src when the source is
-# already checked out), and ZIG_VERSION from honk/zig-version.
+# already checked out), and ZIG_VERSION, which is always "latest": honk stopped
+# pinning Zig in 2a23ce8736, so any current release builds the same way.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,8 +55,7 @@ BPF_LINKER_SHA256=$(sed -n 's/^BPF_LINKER_SHA256=//p' "$PINS_FILE" | head -n 1)
   exit 1
 }
 
-ZIG_VERSION=$(tr -d '[:space:]' < "$SCRIPT_DIR/zig-version")
-[ -n "$ZIG_VERSION" ] || { echo "ERROR: honk/zig-version is empty or missing" >&2; exit 1; }
+ZIG_VERSION=latest
 
 printf 'HONK_SRC_URL=%s\nHONK_SRC_VERSION=%s\nBPF_LINKER_VERSION=%s\nBPF_LINKER_SHA256=%s\nZIG_VERSION=%s\n' \
   "$URL" "$REV" "$BPF_LINKER_VERSION" "$BPF_LINKER_SHA256" "$ZIG_VERSION"

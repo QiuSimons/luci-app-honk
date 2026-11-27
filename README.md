@@ -34,16 +34,11 @@ curl -fsSL -o /tmp/bpf-linker.tar.zst \
   "https://github.com/aya-rs/bpf-linker/releases/download/v${BPF_LINKER_VERSION}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
 echo "${BPF_LINKER_SHA256}  /tmp/bpf-linker.tar.zst" | sha256sum -c -
 sudo tar --zstd -xf /tmp/bpf-linker.tar.zst -C /usr/local/bin
-
-curl -fsSL -o /tmp/zig.tar.xz \
-  "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
-sudo tar -xJf /tmp/zig.tar.xz -C /usr/local
-sudo ln -sf "/usr/local/zig-x86_64-linux-${ZIG_VERSION}/zig" /usr/local/bin/zig
 ```
 
-Zig 的下载包按宿主机架构选择，上面是 x86_64。`rustup` 用 `-y` 免交互；`sudo` 没有 NOPASSWD 时需要密码。
+Zig 不固定版本：从 <https://ziglang.org/download/> 取最新发行版，解包后把 `zig` 放进 `PATH` 即可。`rustup` 用 `-y` 免交互；`sudo` 没有 NOPASSWD 时需要密码。
 
-`honk/zig-version` 是 Zig 版本 pin，交叉编译由 `cargo-zigbuild` 驱动，脚本缺少它时会自动安装。
+交叉编译由 `cargo-zigbuild` 驱动，脚本缺少它时会自动安装。
 
 ### 编译 honk-core
 
