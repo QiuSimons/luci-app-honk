@@ -6,11 +6,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=dae
-PKG_VERSION:=2026.11.27~57f67ba
+PKG_VERSION:=2026.11.28~8265d14
 PKG_RELEASE:=1
 
 DAE_SRC_URL:=https://github.com/olicesx/dae.git
-DAE_SRC_VERSION:=57f67ba1175613e742dc0e4e2eae7655dc9fdb72
+DAE_SRC_VERSION:=8265d14db723c02db8ef27c5d203cea36fb22c5a
 DAE_SHORT_VERSION:=$(shell printf '%.7s' "$(DAE_SRC_VERSION)")
 
 PKG_LICENSE:=AGPL-3.0-only
